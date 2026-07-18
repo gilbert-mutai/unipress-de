@@ -11,7 +11,29 @@
 
 ---
 
-## 1. What documents to use
+## 0.5 Official sample dataset (PROVIDED — this is our primary corpus)
+
+The organizers provided sample materials for testing (`sample_files_for_PR/`, gitignored). See [`data/manifest.yaml`](../data/manifest.yaml) for full provenance. Summary:
+
+| # | Document | Genre | Lang | License |
+|---|---|---|---|---|
+| 1 | PV power forecast post-processing (Solar Energy 2026) | Research paper | EN | **CC BY 4.0** |
+| 2 | Pap smear automatic screening (Biomed. Signal Proc. 2026) | Research paper | EN | **CC BY 4.0** |
+| 3 | UAV obstacle avoidance LT-DQN (Results in Eng. 2026) | Research paper | EN | **CC BY 4.0** |
+| 4 | RL for observatory placement (PASP 2026) | Research paper | EN | **CC BY 4.0** |
+| 5 | Data Science MSc curriculum (`AT MSc füzet`) | Educational doc | HU | UD institutional |
+| 6 | IT/Maths/Physics teacher-training curriculum | Educational doc | HU | UD institutional |
+
+**Three decisive facts:**
+1. **All four research papers are authored by University of Debrecen, Faculty of Informatics researchers** (the judges' own faculty). Generating PR for these = maximum jury resonance. This *is* the flagship demo material.
+2. **Two input genres, both represented, both bilingual-relevant:** scientific publications (EN) **and** educational/technical documentation (HU curricula). 2.C explicitly lists "educational documentation," and the organizers included it — so the system must handle **both** genres (see §1.5).
+3. **Licensing is pristine:** all 4 papers are **CC BY 4.0** (reuse + redistribution permitted *with attribution*); the 2 curricula are UD's own institutional documents. We still keep the PDFs out of git (large, competition-provided) and display attribution on outputs.
+
+**Implication:** the earlier "hunt for open-access papers" plan is now *secondary*. The provided set is the primary dev + demo corpus; externally-sourced CC-BY papers (§1.1) are only for **expanding the eval gold set** if we want more volume.
+
+---
+
+## 1. What documents to use (supplementary sources, if expanding beyond the sample set)
 
 ### 1.1 Primary source: open-access research papers
 | Source | Why | Licensing reality |
@@ -33,9 +55,20 @@
 - Mostly English papers (for volume), **plus 2–3 Hungarian or HU-relevant papers** so the bilingual claim is demonstrated on native HU source too — not only EN→HU generation.
 
 ### 1.4 How many
-- **Development set:** 5–7 papers (iterate fast).
-- **Gold/eval set:** 10–15 papers (from `05`), non-overlapping with dev.
-- **Demo picks:** 2–3 visually clean papers with a clear headline finding, at least one with a good table/figure to show numeric verification.
+- **Development + demo set:** the **6 provided sample documents** (primary).
+- **Gold/eval set:** the 6 provided + optionally 5–9 externally-sourced CC-BY papers to reach ~10–15 for more stable percentages.
+- **Demo picks:** 2–3 of the provided papers with a clear headline finding — recommend **Pap smear** (numbers), **UAV** (clean 100% result), **observatory placement** (visual appeal). Plus one **HU curriculum** to prove the second genre + native-HU processing.
+
+### 1.5 Two input genres → two output modes (design update)
+
+The sample set forces a broader-than-planned input surface. Both are in scope:
+
+| Genre | Sample docs | PR/comms outputs | Notes |
+|---|---|---|---|
+| **Scientific publication** | 4 papers (EN) | Press release, public article, social, exec summary, video script | The flagship path; findings + numbers → research communication. |
+| **Educational documentation** | 2 curricula (HU) | Programme highlight sheet, prospective-student post, "why study X at UD" brief, programme FAQ | Facts = programme structure, credits, specialisations, career outcomes — not "findings". |
+
+**Solo-scope call:** lead the build and demo with the **research-paper path** (richer, stronger TrustLayer story). Support the **educational path** as a second `OutputSpec` family over the same pipeline — the claim model still applies (a "claim" from a curriculum = "The MSc requires 120 credits", cited to a page). This gives a genuine *breadth* moment in the demo without doubling the work, and directly answers the organizers' inclusion of educational docs.
 
 ---
 
@@ -132,11 +165,12 @@ sources.csv       # human-readable source/license index (committed)
 
 ## 7. Concrete first actions (when we start building)
 
-1. Pick **3 arXiv (CC-BY) + 2 PMC OA + 2 HU/UD-repo** papers → fill `manifest.yaml` with licenses.
-2. Verify each is born-digital and parses cleanly (reject scanned ones for now).
-3. Choose the 2–3 demo papers (clear finding + a good table).
-4. Build gold facts for the eval set (semi-automated).
-5. Author the adversarial set.
+1. ~~Pick papers~~ → **Done: the 6 provided sample docs are the corpus** ([`data/manifest.yaml`](../data/manifest.yaml)).
+2. Verify each parses cleanly (all born-digital; confirm HU accents + multi-column layout on the papers).
+3. Confirm the 2–3 demo papers + 1 HU curriculum (see §1.4).
+4. Build gold facts for the eval set (semi-automated) starting with the provided docs.
+5. Author the adversarial set (perturb real sentences from these papers — e.g. change "88.8%" to "98.8%").
+6. *(Optional)* add 5–9 external CC-BY papers if we want a larger gold set.
 
 > Effort: ~2–3 focused days once the extractor works — front-loaded so evaluation is ready the moment generation is.
 
@@ -144,8 +178,10 @@ sources.csv       # human-readable source/license index (committed)
 
 ## 8. Compliance summary (for the one-pager / jury)
 
-- **All sources open-access with reuse licenses (CC-BY/SA/0 or OA subset); provenance + license recorded per document.**
-- **No copyrighted full text committed or redistributed; attribution shown on outputs.**
+- **Primary corpus = the organizers' official sample materials, used for their intended testing purpose.**
+- **All four research papers are CC BY 4.0** (reuse + redistribution permitted with attribution); the two curricula are the University of Debrecen's own institutional documents.
+- **Attribution (title, authors, DOI, license) is shown on every generated output** and recorded in [`data/manifest.yaml`](../data/manifest.yaml).
+- **PDFs are not committed to the repo** (large + competition-provided); only the manifest and gold facts (minimal quoted spans) are versioned.
 - **DKV transport / Green Sentinel data are 2.B-restricted** — *not* used as 2.C source material here (avoids terms-of-use conflicts).
 - **Processing can run fully locally for privacy-sensitive inputs.**
 

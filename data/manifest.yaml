@@ -1,0 +1,98 @@
+# UniPress DE — Source Document Manifest
+# Official sample materials provided by the DEIK.AI Challenge 2026 (category 2.C).
+# The PDFs live in sample_files_for_PR/ and are gitignored (not redistributed in-repo).
+# All four research papers are CC BY 4.0 (reuse permitted with attribution).
+# The two Hungarian documents are the University of Debrecen's own curricula (educational documentation).
+
+meta:
+  provided_by: "DEIK.AI Challenge 2026 organizers (official sample materials)"
+  location: "sample_files_for_PR/"
+  committed_to_git: false          # PDFs gitignored; this manifest is committed
+  retrieved_on: "2026-07-18"
+
+documents:
+  - id: solar_pv_forecast
+    file: "1-s2.0-S0038092X26000496-main.pdf"
+    genre: research_paper
+    title: "Post-processing of ensemble photovoltaic power forecasts with distributional and quantile regression methods"
+    authors: ["Martin János Mayer", "Ágnes Baran", "Sebastian Lerch", "Nina Horat", "Dazhi Yang", "Sándor Baran"]
+    venue: "Solar Energy 307 (2026) 114361"
+    doi: "10.1016/j.solener.2026.114361"
+    publisher: "Elsevier / International Solar Energy Society"
+    license: "CC BY 4.0"
+    language: en
+    domain: "energy / ML / statistics"
+    pages: 17
+    ud_affiliation: true            # Baran, Baran — UD Faculty of Informatics
+    notes: "Strong sustainability/energy angle; probabilistic forecasting."
+
+  - id: pap_smear_screening
+    file: "1-s2.0-S174680942601270X-main.pdf"
+    genre: research_paper
+    title: "Automatic screening system for conventional Pap smear analysis"
+    authors: ["David Kupas", "Ilona Kovacs", "Andras Hajdu", "Balazs Harangi"]
+    venue: "Biomedical Signal Processing and Control 124 (2026) 110716"
+    doi: "10.1016/j.bspc.2026.110716"
+    publisher: "Elsevier"
+    license: "CC BY 4.0"
+    language: en
+    domain: "deep learning / medical imaging"
+    pages: 10
+    ud_affiliation: true            # UD Faculty of Informatics + UD Clinical Center
+    notes: "Rich numeric claims (88.8% accuracy, 339 smears, 12M cell predictions) — ideal for numeric TrustLayer demo; high public-communication value."
+
+  - id: uav_obstacle_avoidance
+    file: "1-s2.0-S2590123026011850-main.pdf"
+    genre: research_paper
+    title: "A hybrid framework for UAV obstacle avoidance integrating reactive sensing, LiDAR planning, and deep reinforcement learning in real time"
+    authors: ["Alaa H. Ahmed", "Henrietta Tomán"]
+    venue: "Results in Engineering 30 (2026) 110150"
+    doi: "10.1016/j.rineng.2026.110150"
+    publisher: "Elsevier B.V."
+    license: "CC BY 4.0"
+    language: en
+    domain: "reinforcement learning / robotics"
+    pages: 14
+    ud_affiliation: true            # UD Faculty of Informatics
+    notes: "Clear headline results (100% success, zero collisions, clearance/time metrics)."
+
+  - id: rl_observatory_placement
+    file: "Tardi_2026_PASP_138_044506.pdf"
+    genre: research_paper
+    title: "Reinforcement Learning for Optimal Astronomical Observatory Placement: Geometrical Constraints and Temporal Variations"
+    authors: ["Tamas Tardi", "Gergo Bogacsovics", "Robert Szabo", "Krisztian Sarneczky", "Andras Hajdu"]
+    venue: "Publications of the Astronomical Society of the Pacific 138:044506 (2026)"
+    doi: "10.1088/1538-3873/ae5a74"
+    publisher: "IOP Publishing / ASP"
+    license: "CC BY 4.0"
+    language: en
+    domain: "astronomy / reinforcement learning"
+    pages: 15
+    ud_affiliation: true            # UD Faculty of Informatics + Konkoly Observatory
+    notes: "Visually compelling, high public appeal; good for the flagship demo."
+
+  - id: msc_data_science_curriculum
+    file: "AT MSc füzet_2023_20252026_0.pdf"
+    genre: educational_documentation
+    title: "Adattudomány (MSc) szak — 2023-as mintatanterv (2025/2026 tanév)"
+    title_en: "Data Science (MSc) programme — sample curriculum"
+    authors: ["University of Debrecen, Faculty of Informatics"]
+    license: "UD institutional document (educational)"
+    language: hu
+    domain: "education / curriculum"
+    pages: 9
+    ud_affiliation: true
+    notes: "Educational-documentation genre; PR outputs = programme promotion, prospective-student communication."
+
+  - id: teacher_training_curriculum
+    file: "Osztatlan IT_matematika_fizika tanár_2025 tanterv_2025.pdf"
+    genre: educational_documentation
+    title: "Informatikatanár (digitális kultúra tanára) – matematika/fizika szakos tanár — osztatlan tanárképzési szak tanterve (2025)"
+    title_en: "IT (digital culture) + mathematics/physics teacher training — undivided programme curriculum"
+    authors: ["University of Debrecen, Faculty of Informatics"]
+    license: "UD institutional document (educational)"
+    language: hu
+    domain: "education / curriculum"
+    pages: 6
+    ud_affiliation: true
+    notes: "Second educational-documentation sample; validates HU-native processing + programme-promotion outputs."
