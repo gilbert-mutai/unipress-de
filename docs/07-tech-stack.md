@@ -33,7 +33,8 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 | Experiment tracking | Files (MVP) → **MLflow** (competition+) | Reproducible metric runs |
 | Observability | **structlog** + Postgres metrics (MVP) → **OpenTelemetry** | Latency/cost/eval visibility |
 | Packaging | **uv** (Python), **pnpm** (JS) | Fast, reproducible installs |
-| Deployment | **Docker + Docker Compose** | One-command local stack = "locally deployable" |
+| Deployment | **Docker + Docker Compose** | One-command stack = "locally deployable" |
+| Reverse proxy / TLS | **Nginx + Certbot** | Builder's existing workflow; Let's Encrypt auto-renew |
 | CI | **GitHub Actions** (lint, test, build) | Cheap quality gate; MLOps-ready |
 
 ---
@@ -179,18 +180,20 @@ The system is **fully hosted** — nothing runs on the presenter's laptop during
 - **Runtime:** Docker Engine + Docker Compose (the same compose stack from local dev — dev/prod parity).
 
 ### 9.2 Public access + TLS + domain
-- **Reverse proxy: Caddy** in front of the stack — **automatic HTTPS via Let's Encrypt** (auto-renewing certs), minimal config. It terminates TLS and routes to the frontend and API containers.
-  - *Alternatives:* Traefik (label-driven, nice with Compose) or Nginx + Certbot (most manual). Caddy chosen for least-effort automatic TLS on a solo timeline.
+- **Reverse proxy: Nginx** in front of the stack — terminates TLS and routes to the frontend and API containers.
+- **TLS: Certbot (Let's Encrypt)** issues and auto-renews the certificate (`certbot --nginx` + the renewal timer). Chosen because the builder already uses Nginx + Certbot — lower delivery risk than a new tool.
+  - *Alternatives considered:* Caddy (automatic TLS, less config) or Traefik (label-driven); rejected in favor of the builder's existing Nginx/Certbot workflow.
 - **DNS:** add an **A record** for the chosen subdomain → the VM's public IP, in the `gilbertmutai.com` zone.
 - **Suggested subdomain:** `unipress.gilbertmutai.com` (frontend). API served under the same host at `/api` (single origin, no CORS hassle) — or `api.unipress.gilbertmutai.com` if we prefer split origins.
+- **Deployment note:** Nginx can run either as a container in the compose stack or directly on the host (host install pairs most naturally with `certbot --nginx`). Either works; host-Nginx is the more familiar path.
 
 ### 9.3 Compose topology (production)
 ```mermaid
 flowchart TD
-    NET[Internet] -->|443 HTTPS| CADDY[Caddy<br/>reverse proxy + TLS]
+    NET[Internet] -->|443 HTTPS| NGINX[Nginx + Certbot<br/>reverse proxy + TLS]
     subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose"]
-        CADDY --> FE[frontend: Next.js]
-        CADDY -->|/api| API[api: FastAPI]
+        NGINX --> FE[frontend: Next.js]
+        NGINX -->|/api| API[api: FastAPI]
         API --> PG[(postgres)]
         API --> CH[(chroma)]
         API --> VOL[(persistent volumes:<br/>uploads, outputs, model cache)]
@@ -205,7 +208,7 @@ flowchart TD
 ### 9.5 Security & ops
 - **Firewall:** allow 80/443 (web) and 22 (SSH, ideally restricted to known IPs); everything else closed. Inter-container traffic stays on the Docker network — Postgres/Chroma are **not** published to the host/internet.
 - **Secrets:** `.env` on the server (git-ignored) holds the **OpenAI API key**, DB credentials, etc. Never in the image or repo.
-- **HTTPS everywhere:** Caddy handles cert issuance/renewal; app configured for the public origin.
+- **HTTPS everywhere:** Nginx terminates TLS; Certbot issues + auto-renews the Let's Encrypt cert (renewal via the systemd timer / cron); app configured for the public origin. Port 80 is kept open for the ACME HTTP-01 challenge and redirects to 443.
 - **Backups:** periodic dump of Postgres + Chroma volume (cheap `cron` + `pg_dump`), given the eval/gold data matters.
 - **Updates/redeploy:** `git pull` + `docker compose up -d --build` on the VM; optional GitHub Actions → SSH deploy later (matches builder's CI/CD strength).
 

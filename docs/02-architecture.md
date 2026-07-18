@@ -220,10 +220,10 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    NET[Internet] -->|443 HTTPS<br/>unipress.gilbertmutai.com| CADDY[Caddy<br/>reverse proxy + TLS]
+    NET[Internet] -->|443 HTTPS<br/>unipress.gilbertmutai.com| NGINX[Nginx + Certbot<br/>reverse proxy + TLS]
     subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose"]
-        CADDY --> FEc[frontend: next.js]
-        CADDY -->|/api| APIc[api: fastapi]
+        NGINX --> FEc[frontend: next.js]
+        NGINX -->|/api| APIc[api: fastapi]
         APIc --> DBc[(postgres:<br/>claims/spans/metrics)]
         APIc --> CHc[(chroma:<br/>vectors)]
         APIc --> VOL[(volumes:<br/>uploads/outputs/model cache)]
@@ -236,7 +236,7 @@ flowchart TD
 ```
 
 - **MVP (local dev):** `docker compose up` brings the whole system up on one machine — dev/prod parity.
-- **Competition (deployed):** the **same compose stack on an Angani cloud VM** (8 vCPU / 16 GB / 100 GB, Ubuntu 24.04), fronted by **Caddy** for automatic HTTPS, reachable at a **`gilbertmutai.com` subdomain**. Nothing runs on the presenter's laptop — judges can open the URL themselves. Full details in [`07-tech-stack.md`](07-tech-stack.md) §9.
+- **Competition (deployed):** the **same compose stack on an Angani cloud VM** (8 vCPU / 16 GB / 100 GB, Ubuntu 24.04), fronted by **Nginx + Certbot** for HTTPS, reachable at a **`gilbertmutai.com` subdomain**. Nothing runs on the presenter's laptop — judges can open the URL themselves. Full details in [`07-tech-stack.md`](07-tech-stack.md) §9.
 - **Production:** Kubernetes + Terraform (builder's strengths), managed Postgres, Qdrant, autoscaled model serving (vLLM), object storage. **Deferred — not built for the competition.**
 
 ---
@@ -244,7 +244,7 @@ flowchart TD
 ## 6. Security & data-handling architecture
 
 - **Secrets:** `.env` (git-ignored) on the server → env vars; the **OpenAI API key**, DB credentials, etc. never in code or the image. Production: a secrets manager.
-- **Network isolation:** only Caddy (80/443) and SSH (22, restricted) are exposed; Postgres/Chroma stay on the internal Docker network, never published to the internet.
+- **Network isolation:** only Nginx (80/443) and SSH (22, restricted) are exposed; Postgres/Chroma stay on the internal Docker network, never published to the internet.
 - **Data minimization / privacy:** documents processed on the VM; the optional **local Ollama inference path** keeps sensitive/unpublished inputs off any external API — a concrete privacy story for the jury (default path sends text to OpenAI).
 - **Licensing safety:** primary corpus = the organizers' CC BY 4.0 sample papers + UD's own curricula (see [`06-dataset-strategy.md`](06-dataset-strategy.md)); uploads are user-owned; no PDFs committed (see `.gitignore`); attribution shown on outputs; provenance stored per document.
 - **Input safety:** validate file type/size; treat PDF text as untrusted; guard against prompt-injection embedded in documents (system prompts isolate source text; TrustLayer catches injected "facts" with no grounding).
