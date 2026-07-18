@@ -41,10 +41,10 @@ flowchart TD
         REV --> OUT[Bilingual Output Renderer]
     end
 
-    GEN <-->|generation| LLM[LLM Gateway<br/>swappable]
-    TL <-->|NLI / grounding| LLM
-    LLM -.-> HOSTED[Hosted frontier LLM]
-    LLM -.-> LOCAL[Local OSS LLM]
+    GEN <-->|generation| LLM[LLM Gateway<br/>LiteLLM · swappable]
+    TL <-->|LLM judge| LLM
+    LLM -.-> HOSTED[OpenAI API<br/>default]
+    LLM -.-> LOCAL[Local OSS LLM<br/>Ollama · optional]
 
     API --> OBS[Observability<br/>logs + traces + eval metrics]
 ```
@@ -136,7 +136,7 @@ For each component: **purpose · why needed · recommended tech · alternatives 
 ### 2.12 LLM Gateway (swappable model layer)
 - **Purpose:** Single abstraction over generation + judging models; config-driven choice of hosted vs. local.
 - **Why needed:** The hybrid strategy depends on this; also enables cost/latency control and prevents vendor lock-in.
-- **Recommended:** Thin internal client or **LiteLLM** to unify APIs; hosted frontier model for quality, **Ollama / vLLM** for local OSS models.
+- **Recommended:** **LiteLLM** to unify APIs; **OpenAI (GPT-4o/GPT-4.1)** for quality by default, **Ollama / vLLM** for optional local OSS models.
 - **Alternatives:** Hard-code one provider (kills the hybrid narrative — avoid).
 - **Trade-offs:** A small abstraction cost now buys the entire "locally deployable, no lock-in" story and easy A/B of models in eval.
 
@@ -220,33 +220,33 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    subgraph Docker Compose
-        FEc[frontend: next.js]
-        APIc[api: fastapi]
-        DBc[(postgres:<br/>claims/spans/metrics)]
-        CHc[(chroma:<br/>vectors)]
-        OLc[ollama: local LLM optional]
+    NET[Internet] -->|443 HTTPS<br/>unipress.gilbertmutai.com| CADDY[Caddy<br/>reverse proxy + TLS]
+    subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose"]
+        CADDY --> FEc[frontend: next.js]
+        CADDY -->|/api| APIc[api: fastapi]
+        APIc --> DBc[(postgres:<br/>claims/spans/metrics)]
+        APIc --> CHc[(chroma:<br/>vectors)]
+        APIc --> VOL[(volumes:<br/>uploads/outputs/model cache)]
+        OLc[ollama: optional]
         GRc[grobid: optional]
+        APIc -. optional .-> OLc
+        APIc -. optional .-> GRc
     end
-    FEc --> APIc
-    APIc --> DBc
-    APIc --> CHc
-    APIc -. local .-> OLc
-    APIc -. hosted .-> EXT[Hosted LLM API]
-    APIc -. optional .-> GRc
+    APIc -->|HTTPS| EXT[OpenAI API]
 ```
 
-- **MVP:** `docker-compose up` brings the whole system up locally — one command, great for the demo and the "locally deployable" claim.
-- **Competition:** same compose, optionally deployed to a single cloud VM for a public demo URL.
-- **Production:** Kubernetes + Terraform (your strengths), managed Postgres, autoscaled model serving (vLLM), object storage for docs. **Deferred — not built for MVP.**
+- **MVP (local dev):** `docker compose up` brings the whole system up on one machine — dev/prod parity.
+- **Competition (deployed):** the **same compose stack on an Angani cloud VM** (8 vCPU / 16 GB / 100 GB, Ubuntu 24.04), fronted by **Caddy** for automatic HTTPS, reachable at a **`gilbertmutai.com` subdomain**. Nothing runs on the presenter's laptop — judges can open the URL themselves. Full details in [`07-tech-stack.md`](07-tech-stack.md) §9.
+- **Production:** Kubernetes + Terraform (builder's strengths), managed Postgres, Qdrant, autoscaled model serving (vLLM), object storage. **Deferred — not built for the competition.**
 
 ---
 
 ## 6. Security & data-handling architecture
 
-- **Secrets:** `.env` (git-ignored) → env vars; no keys in code. Production: a secrets manager.
-- **Data minimization / privacy:** documents processed locally; hybrid mode allows **fully local inference** so sensitive/unpublished papers never leave the machine — a concrete privacy story for the jury.
-- **Licensing safety:** default corpus = open-access only (arXiv/DOAJ/PMC); uploads are user-owned; nothing copyrighted committed (see `.gitignore`). Provenance stored per document.
+- **Secrets:** `.env` (git-ignored) on the server → env vars; the **OpenAI API key**, DB credentials, etc. never in code or the image. Production: a secrets manager.
+- **Network isolation:** only Caddy (80/443) and SSH (22, restricted) are exposed; Postgres/Chroma stay on the internal Docker network, never published to the internet.
+- **Data minimization / privacy:** documents processed on the VM; the optional **local Ollama inference path** keeps sensitive/unpublished inputs off any external API — a concrete privacy story for the jury (default path sends text to OpenAI).
+- **Licensing safety:** primary corpus = the organizers' CC BY 4.0 sample papers + UD's own curricula (see [`06-dataset-strategy.md`](06-dataset-strategy.md)); uploads are user-owned; no PDFs committed (see `.gitignore`); attribution shown on outputs; provenance stored per document.
 - **Input safety:** validate file type/size; treat PDF text as untrusted; guard against prompt-injection embedded in documents (system prompts isolate source text; TrustLayer catches injected "facts" with no grounding).
 - **Auditability:** every output carries its evidence trail + model/version used — reproducibility and accountability.
 

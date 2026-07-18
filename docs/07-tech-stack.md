@@ -23,8 +23,8 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 | Embeddings | **BGE-M3** (multilingual) via sentence-transformers | One model for HU + EN; strong retrieval |
 | Reranker | **bge-reranker-v2-m3** (optional) | Precision boost when needed |
 | NLI (TrustLayer T1) | **DeBERTa-v3 MNLI cross-encoder** | Fast local entailment; the cheap trust gate |
-| LLM gateway | **LiteLLM** | One API over hosted + local; swappable |
-| LLM (generation) | **Hosted frontier (Claude)** default; **local via Ollama** | Quality by default; privacy/offline fallback |
+| LLM gateway | **LiteLLM** | One API over providers; swappable, no lock-in |
+| LLM (generation) | **OpenAI (GPT-4o / GPT-4.1)** default; **local via Ollama** optional | Builder has OpenAI credits; quality by default; local fallback for privacy demo |
 | Vector store | **Chroma** (dedicated) | Purpose-built vector DB; builder has prior experience → lower risk |
 | Database | **PostgreSQL 16** | Claims, spans, metrics, provenance (relational) |
 | Object/file store | **Local FS** (MVP) → S3-compatible (**MinIO**) later | Simple now, cloud-ready path |
@@ -47,18 +47,19 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 
 ### 2.2 Embedding model — **BGE-M3**
 - **Decision:** **BGE-M3** (multilingual, 100+ languages incl. Hungarian; supports dense + sparse + multi-vector).
-- **Why:** One model covers EN papers *and* HU curricula — critical for the bilingual requirement. Strong retrieval benchmarks, OSS, runs locally (keeps the privacy story).
-- **Alternative:** multilingual-e5-large (also good). Decide by a quick retrieval test on 1 EN + 1 HU doc; BGE-M3 is the default.
+- **Why:** One model covers EN papers *and* HU curricula — critical for the bilingual requirement. Strong retrieval benchmarks, OSS, runs locally on CPU (keeps the privacy story + zero marginal cost).
+- **Alternative:** multilingual-e5-large (also good); **OpenAI `text-embedding-3-large`** is a trivial swap given the OpenAI credits, but BGE-M3 stays the default for multilingual/HU quality, local execution, and no per-embedding cost. Decide by a quick retrieval test on 1 EN + 1 HU doc.
 
 ### 2.3 NLI model + threshold — **DeBERTa-v3 MNLI**, τ_high ≈ 0.85
 - **Decision:** A DeBERTa-v3-large MNLI/FEVER cross-encoder for Tier-1 entailment; contradiction cutoff 0.5, entail cutoff τ_high = 0.85 (tuned on the gold set).
 - **Why:** Small, fast, deterministic, runs local — the cheap gate that keeps most sentences off the LLM in verification. Multilingual NLI (e.g. mDeBERTa-XNLI) for HU output.
 - **Trade-off:** English MNLI models are strongest; for HU verification use **mDeBERTa-v3-XNLI**; if quality lags, escalate HU sentences to the Tier-2 LLM judge more aggressively.
 
-### 2.4 Hosted LLM (generation tier) — **Claude (frontier) via LiteLLM**, swappable
-- **Decision:** Default generation + Tier-2 judge on a **hosted frontier model (Claude)** for quality; **Ollama-served local model** (e.g. Llama/Qwen) as the drop-in for offline/privacy mode. All calls go through **LiteLLM** so switching is a config change.
-- **Why:** Generation quality and nuanced judging are where hosted frontier models clearly win, and output quality is what the jury sees. The gateway preserves the "locally deployable, no lock-in" narrative and enables the hosted-vs-local ablation in evaluation.
-- **Cost control:** Tier-1 NLI gating minimizes LLM judge calls; extraction/generation are cached per document.
+### 2.4 Hosted LLM (generation tier) — **OpenAI via LiteLLM**, swappable
+- **Decision:** Default generation on **OpenAI GPT-4o / GPT-4.1**; **Tier-2 verification judge on a cheaper model (gpt-4o-mini)** to control cost. An **Ollama-served local model** (e.g. Llama/Qwen) is the optional drop-in for the offline/privacy demo. All calls route through **LiteLLM**, so switching provider/model is a config change.
+- **Why:** The builder already has OpenAI credits, so it's the pragmatic default; generation quality and nuanced judging are what the jury sees. The LiteLLM gateway keeps the "no lock-in / locally deployable" narrative intact and enables the hosted-vs-local ablation in evaluation.
+- **Model split:** big model for generation (quality shows), mini model for the verification judge (runs often → cost-sensitive). Both configurable per stage.
+- **Cost control:** Tier-1 local NLI gating minimizes judge calls; extraction/generation cached per document; demo outputs pre-generated to avoid live rate limits.
 
 ### 2.5 Confidence-score formula — implemented as in `03` §5.4
 - Weighted blend of NLI entailment + judge supported-fraction + numeric/entity overlap, with a hard numeric-mismatch penalty. Weights (`0.4/0.4/0.2`) and export threshold (`0.7`) are **config values**, tuned against the gold set.
@@ -95,12 +96,12 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 | Embeddings | BGE-M3 (local) | same | GPU-served |
 | Vector store | Chroma | Chroma | Qdrant (scale) |
 | NLI verify | DeBERTa MNLI (local) | + mDeBERTa (HU) | fine-tuned |
-| Generation/judge | Claude via LiteLLM | + local Ollama option | vLLM cluster |
+| Generation/judge | OpenAI via LiteLLM | + local Ollama option | vLLM cluster |
 | Frontend | Next.js | polished | same + auth |
 | Storage | local FS | local FS | MinIO/S3 |
 | Eval | files + RAGAS | + MLflow | CI-gated eval |
 | Observability | structlog + PG | + OpenTelemetry | Prometheus/Grafana |
-| Deploy | Docker Compose | Compose (+VM) | K8s + Terraform |
+| Deploy | Docker Compose (local) | Compose on Angani VM + domain/TLS | K8s + Terraform |
 | CI | GitHub Actions | same | + eval gates |
 
 ---
@@ -139,7 +140,7 @@ unipress-de/
 ```
 fastapi, uvicorn[standard], pydantic>=2, sqlalchemy, psycopg[binary], chromadb,
 pymupdf, docling (optional), sentence-transformers, FlagEmbedding (BGE-M3),
-transformers, torch, litellm, ragas, textstat, sacrebleu, bert-score,
+transformers, torch, litellm, openai, ragas, textstat, sacrebleu, bert-score,
 jinja2, weasyprint, structlog, python-multipart, tenacity, pytest
 ```
 **JS (frontend):** `next, react, typescript, tailwindcss, @tanstack/react-query, zod`
@@ -150,8 +151,9 @@ jinja2, weasyprint, structlog, python-multipart, tenacity, pytest
 
 ## 7. Hardware & runtime notes (solo, realistic)
 
-- **Embeddings + NLI** run on CPU acceptably for single-document workloads; a modest GPU (or CPU with patience) is fine for the demo. BGE-M3 and DeBERTa are small enough for a laptop.
-- **Generation** is API-bound (hosted) → no local GPU needed for the default path; local Ollama path benefits from a GPU but can run quantized models on CPU for the privacy demo.
+- **Target server:** Angani cloud VM — **8 vCPU / 16 GB RAM / 100 GB SSD, Ubuntu 24.04** (see §9). Generous for Profile A; embeddings + NLI have plenty of CPU headroom.
+- **Embeddings + NLI** run on CPU comfortably for single-document workloads; BGE-M3 (~2–4 GB) and DeBERTa (~1.5–2 GB) load into RAM with room to spare on 16 GB.
+- **Generation** is API-bound (OpenAI) → **no GPU needed** for the default path. The optional local Ollama path would want a GPU (not present on this VM), so it stays a documented option rather than a live demo feature here.
 - **Everything comes up with `docker compose up`** — the single most important "it's real and deployable" signal for the jury.
 
 ---
@@ -165,6 +167,53 @@ jinja2, weasyprint, structlog, python-multipart, tenacity, pytest
 | Frontier LLM cost/rate limits during demo | Cache aggressively; pre-generate demo outputs; local Ollama fallback |
 | Torch/CUDA image bloat | CPU-only torch wheel for MVP image; document GPU variant |
 | GROBID/Ollama add ops weight | Both optional/profiled in compose; core stack runs without them |
+
+## 9. Deployment & infrastructure (Angani cloud)
+
+The system is **fully hosted** — nothing runs on the presenter's laptop during the demo. It is reached over the public internet at a `gilbertmutai.com` subdomain over HTTPS.
+
+### 9.1 Server
+- **Provider:** Angani cloud (builder's employer).
+- **Spec:** 8 vCPU / 16 GB RAM / 100 GB SSD.
+- **OS:** Ubuntu Server 24.04 LTS.
+- **Runtime:** Docker Engine + Docker Compose (the same compose stack from local dev — dev/prod parity).
+
+### 9.2 Public access + TLS + domain
+- **Reverse proxy: Caddy** in front of the stack — **automatic HTTPS via Let's Encrypt** (auto-renewing certs), minimal config. It terminates TLS and routes to the frontend and API containers.
+  - *Alternatives:* Traefik (label-driven, nice with Compose) or Nginx + Certbot (most manual). Caddy chosen for least-effort automatic TLS on a solo timeline.
+- **DNS:** add an **A record** for the chosen subdomain → the VM's public IP, in the `gilbertmutai.com` zone.
+- **Suggested subdomain:** `unipress.gilbertmutai.com` (frontend). API served under the same host at `/api` (single origin, no CORS hassle) — or `api.unipress.gilbertmutai.com` if we prefer split origins.
+
+### 9.3 Compose topology (production)
+```mermaid
+flowchart TD
+    NET[Internet] -->|443 HTTPS| CADDY[Caddy<br/>reverse proxy + TLS]
+    subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose"]
+        CADDY --> FE[frontend: Next.js]
+        CADDY -->|/api| API[api: FastAPI]
+        API --> PG[(postgres)]
+        API --> CH[(chroma)]
+        API --> VOL[(persistent volumes:<br/>uploads, outputs, model cache)]
+    end
+    API -->|HTTPS| OA[OpenAI API]
+```
+
+### 9.4 Persistence & data
+- **Named Docker volumes** for: Postgres data, Chroma data, uploaded PDFs, generated outputs, and the HF model cache (so BGE-M3/DeBERTa download once). These survive container restarts/redeploys.
+- 100 GB SSD budget: OS + Docker images (~15 GB incl. CPU-only torch) + model cache (~8 GB) + Postgres/Chroma (small) + uploads/outputs — comfortable.
+
+### 9.5 Security & ops
+- **Firewall:** allow 80/443 (web) and 22 (SSH, ideally restricted to known IPs); everything else closed. Inter-container traffic stays on the Docker network — Postgres/Chroma are **not** published to the host/internet.
+- **Secrets:** `.env` on the server (git-ignored) holds the **OpenAI API key**, DB credentials, etc. Never in the image or repo.
+- **HTTPS everywhere:** Caddy handles cert issuance/renewal; app configured for the public origin.
+- **Backups:** periodic dump of Postgres + Chroma volume (cheap `cron` + `pg_dump`), given the eval/gold data matters.
+- **Updates/redeploy:** `git pull` + `docker compose up -d --build` on the VM; optional GitHub Actions → SSH deploy later (matches builder's CI/CD strength).
+
+### 9.6 Cost & availability
+- OpenAI usage billed to existing credits; Tier-1 NLI gating + caching + pre-generated demo outputs keep token spend low and remove live rate-limit risk during the presentation.
+- VM runs continuously through the competition window; the public URL means judges can try it themselves (a strong credibility signal vs. a laptop-only demo).
+
+---
 
 ## Next phase
 

@@ -1,7 +1,7 @@
 # UniPress DE — Project Definition
 
 > **DEIK.AI Challenge 2026 · Category 2.C — AI-Assisted PR Content Generation**
-> Status: Definition locked · Build mode: Solo · LLM strategy: Hybrid (open-source core + swappable hosted frontier LLM)
+> Status: Definition locked · Build mode: Solo · LLM strategy: Hybrid (open-source core + OpenAI for generation, swappable via LiteLLM)
 > Demo deadline: 25 September 2026 · Possible AI Sprint Final: 9–10 October 2026
 
 ---
