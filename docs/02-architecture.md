@@ -60,7 +60,7 @@ flowchart TD
 
 ## 2. Component architecture
 
-For each component: **purpose · why needed · recommended tech · alternatives · trade-offs**. Components not justified for the solo MVP are listed in §7 (Deliberate exclusions).
+For each component: **purpose · why needed · recommended tech · alternatives · trade-offs**. Components deliberately scoped out are listed in §7 (Deliberate exclusions).
 
 ### 2.1 Frontend — Review & Demo UI
 - **Purpose:** Upload a paper, trigger generation, and — the money shot — show each generated claim next to its source evidence, with accept/edit/flag controls.
