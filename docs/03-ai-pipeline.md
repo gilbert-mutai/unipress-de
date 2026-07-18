@@ -118,7 +118,7 @@ Brittle on scientific prose, poor at multi-clause findings, no notion of claim t
 ## 3. Stage 2 — Retrieval
 
 Two consumers, two retrieval modes:
-- **Generation context:** hybrid retrieval (dense pgvector + lexical/BM25) over chunks, plus the full claim list for the requested angle. Rerank top-k with `bge-reranker` if needed.
+- **Generation context:** hybrid retrieval (dense vectors in Chroma + lexical/BM25) over chunks, plus the full claim list for the requested angle. Rerank top-k with `bge-reranker` if needed.
 - **Verification context (TrustLayer):** given a generated sentence's `claim_ids`, fetch those claims' spans directly (no fuzzy search) — verification checks the *cited* evidence, not merely *some* evidence. This distinction is what makes the check honest.
 
 ---

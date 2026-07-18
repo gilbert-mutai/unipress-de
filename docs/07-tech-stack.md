@@ -25,8 +25,8 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 | NLI (TrustLayer T1) | **DeBERTa-v3 MNLI cross-encoder** | Fast local entailment; the cheap trust gate |
 | LLM gateway | **LiteLLM** | One API over hosted + local; swappable |
 | LLM (generation) | **Hosted frontier (Claude)** default; **local via Ollama** | Quality by default; privacy/offline fallback |
-| Vector store | **pgvector** (in Postgres) | One DB for relational + vectors + provenance |
-| Database | **PostgreSQL 16** | Claims, spans, metrics, vectors — all in one |
+| Vector store | **Chroma** (dedicated) | Purpose-built vector DB; builder has prior experience → lower risk |
+| Database | **PostgreSQL 16** | Claims, spans, metrics, provenance (relational) |
 | Object/file store | **Local FS** (MVP) → S3-compatible (**MinIO**) later | Simple now, cloud-ready path |
 | Templating/export | **Jinja2** + **WeasyPrint** (PDF), Markdown/HTML | Deterministic output rendering |
 | Eval | **RAGAS**, **textstat**, **sacrebleu/bert-score**, custom | Faithfulness, readability, sanity |
@@ -63,8 +63,12 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 ### 2.5 Confidence-score formula — implemented as in `03` §5.4
 - Weighted blend of NLI entailment + judge supported-fraction + numeric/entity overlap, with a hard numeric-mismatch penalty. Weights (`0.4/0.4/0.2`) and export threshold (`0.7`) are **config values**, tuned against the gold set.
 
-### 2.6 Vector store — **pgvector** (confirmed)
-- Single-paper-scale corpora make a dedicated vector DB unjustified; pgvector consolidates everything in Postgres. Documented upgrade path to **Qdrant** for multi-tenant/production.
+### 2.6 Vector store — **Chroma** (chosen)
+- **Decision:** Use **Chroma** as a dedicated vector store, run as its own service (or embedded/persistent mode) alongside Postgres.
+- **Why:** The builder has prior hands-on experience with Chroma — for a solo build against a deadline, tool familiarity materially lowers delivery risk and speeds iteration. Chroma is open-source, runs locally (preserves the privacy/local-deploy story), and has a clean Python API and metadata filtering.
+- **Consequence:** Two data services (Postgres for relational/provenance, Chroma for vectors) instead of one. Accepted trade-off — the confidence/speed gain outweighs the extra container for a solo timeline.
+- **Alternatives considered:** pgvector (one fewer service, but a new tool for the builder); Qdrant (excellent, but no prior experience). Documented upgrade path to **Qdrant** if production scale/multi-tenancy demands it.
+- **Note:** Retrieval accesses vectors only through a thin `VectorStore` interface, so swapping Chroma → Qdrant later is a config/adapter change, not a rewrite.
 
 ---
 
@@ -73,7 +77,7 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 | Rejected | In favor of | Reason |
 |---|---|---|
 | LangChain / LlamaIndex as the backbone | Plain Python + thin helpers | Deterministic, debuggable pipeline; avoid framework churn/abstraction tax. May borrow small utilities only. |
-| A dedicated vector DB (Chroma/Qdrant) for MVP | pgvector | One fewer service at this scale |
+| pgvector (vectors inside Postgres) | Chroma | Builder's prior Chroma experience → lower delivery risk for a solo deadline |
 | Node/Nest backend | FastAPI | Keeps AI code in the Python ecosystem |
 | Streamlit/Gradio UI | Next.js | The evidence-review UX is the product + the demo; needs real frontend |
 | OpenAI/Cohere embeddings | BGE-M3 | Breaks the local/privacy story; multilingual OSS is strong enough |
@@ -89,7 +93,7 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 |---|---|---|---|
 | PDF parse + spans | PyMuPDF | + Docling/GROBID | + OCR (Tesseract) |
 | Embeddings | BGE-M3 (local) | same | GPU-served |
-| Vector store | pgvector | pgvector | Qdrant (scale) |
+| Vector store | Chroma | Chroma | Qdrant (scale) |
 | NLI verify | DeBERTa MNLI (local) | + mDeBERTa (HU) | fine-tuned |
 | Generation/judge | Claude via LiteLLM | + local Ollama option | vLLM cluster |
 | Frontend | Next.js | polished | same + auth |
@@ -105,14 +109,14 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 
 ```
 unipress-de/
-├── docker-compose.yml          # postgres(+pgvector), api, frontend, [ollama], [grobid]
+├── docker-compose.yml          # postgres, chroma, api, frontend, [ollama], [grobid]
 ├── .env.example
 ├── api/                        # FastAPI service
 │   ├── pyproject.toml          # uv-managed
 │   ├── app/
 │   │   ├── ingestion/          # parse, chunk, spans
 │   │   ├── claims/             # extraction + store
-│   │   ├── retrieval/          # embeddings, pgvector, rerank
+│   │   ├── retrieval/          # embeddings, chroma, rerank
 │   │   ├── generation/         # per-output-type generators
 │   │   ├── trustlayer/         # NLI + judge + scoring
 │   │   ├── outputs/            # renderers (Jinja2/WeasyPrint), bilingual
@@ -133,13 +137,13 @@ unipress-de/
 
 **Python (api):**
 ```
-fastapi, uvicorn[standard], pydantic>=2, sqlalchemy, psycopg[binary], pgvector,
+fastapi, uvicorn[standard], pydantic>=2, sqlalchemy, psycopg[binary], chromadb,
 pymupdf, docling (optional), sentence-transformers, FlagEmbedding (BGE-M3),
 transformers, torch, litellm, ragas, textstat, sacrebleu, bert-score,
 jinja2, weasyprint, structlog, python-multipart, tenacity, pytest
 ```
 **JS (frontend):** `next, react, typescript, tailwindcss, @tanstack/react-query, zod`
-**Infra:** `postgres:16` + `pgvector`, `ollama/ollama` (optional), `lfoppiano/grobid` (optional)
+**Infra:** `postgres:16`, `chromadb/chroma`, `ollama/ollama` (optional), `lfoppiano/grobid` (optional)
 **Tooling:** `uv`, `ruff`, `mypy`, `pnpm`, GitHub Actions
 
 ---

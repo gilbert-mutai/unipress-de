@@ -31,7 +31,7 @@ flowchart TD
         ING --> CLM[Claim & Fact Extraction]
         CLM --> CS[(Claim Store<br/>Postgres)]
         ING --> CHUNK[Chunking + Embeddings]
-        CHUNK --> VDB[(Vector DB<br/>pgvector)]
+        CHUNK --> VDB[(Vector DB<br/>Chroma)]
         API --> GEN[Content Generation<br/>RAG + citation-aware]
         CS --> GEN
         VDB --> GEN
@@ -88,9 +88,9 @@ For each component: **purpose · why needed · recommended tech · alternatives 
 ### 2.5 Claim Store (structured knowledge)
 - **Purpose:** Canonical record of every claim + provenance; the join key between generation and verification.
 - **Why needed:** Provenance must be queryable and durable, not held in a prompt.
-- **Recommended:** **PostgreSQL** (JSONB for spans). One DB instance also hosts pgvector (§2.7).
-- **Alternatives:** SQLite (fine for MVP, but Postgres = same engine as vectors, better demo/prod story); a graph DB (overkill now).
-- **Trade-offs:** Postgres slightly heavier than SQLite but consolidates relational + vector + provenance in one service. Strong simplicity win.
+- **Recommended:** **PostgreSQL** (JSONB for spans) for relational data + provenance; vectors live separately in Chroma (§2.7).
+- **Alternatives:** SQLite (fine for MVP, but Postgres has a cleaner production story); a graph DB (overkill now).
+- **Trade-offs:** Postgres slightly heavier than SQLite but is the durable, queryable home for claims/spans/metrics and a natural production path.
 
 ### 2.6 Chunking + Embeddings
 - **Purpose:** Make the paper retrievable for RAG.
@@ -102,9 +102,10 @@ For each component: **purpose · why needed · recommended tech · alternatives 
 ### 2.7 Vector Database
 - **Purpose:** Semantic retrieval of chunks.
 - **Why needed:** Core of RAG.
-- **Recommended:** **pgvector** (extension on the existing Postgres).
-- **Alternatives:** Qdrant / Chroma (excellent, but a second service). For a single-paper-at-a-time workload the vector count is tiny — a dedicated vector DB is unjustified complexity for MVP.
-- **Trade-offs:** pgvector = one fewer container, one backup story, "good enough" at this scale. Documented upgrade path to Qdrant if corpus grows (Sprint/production).
+- **Recommended:** **Chroma** (dedicated vector store, run as its own service or in persistent mode).
+- **Why:** The builder has prior hands-on Chroma experience — for a solo build against a deadline, familiarity lowers delivery risk and speeds iteration. Open-source, local, clean Python API with metadata filtering.
+- **Alternatives:** pgvector (keeps everything in one Postgres service, but a new tool for the builder); Qdrant (excellent, no prior experience). 
+- **Trade-offs:** Adds a second data service alongside Postgres — accepted, because the confidence/speed gain from a known tool outweighs the extra container on a solo timeline. Retrieval accesses vectors through a thin `VectorStore` interface, so a later swap to Qdrant is an adapter change, not a rewrite.
 
 ### 2.8 Content Generation (RAG, citation-aware)
 - **Purpose:** Produce each output type (press release, article, social, exec summary, video script) grounded in retrieved chunks + claim store, emitting **structured output where each sentence carries claim IDs**.
@@ -222,12 +223,14 @@ flowchart TD
     subgraph Docker Compose
         FEc[frontend: next.js]
         APIc[api: fastapi]
-        DBc[(postgres + pgvector)]
+        DBc[(postgres:<br/>claims/spans/metrics)]
+        CHc[(chroma:<br/>vectors)]
         OLc[ollama: local LLM optional]
         GRc[grobid: optional]
     end
     FEc --> APIc
     APIc --> DBc
+    APIc --> CHc
     APIc -. local .-> OLc
     APIc -. hosted .-> EXT[Hosted LLM API]
     APIc -. optional .-> GRc
@@ -256,7 +259,7 @@ Per your brief — *only include what's justified.* Explicitly cut for MVP, with
 | Excluded | Why not now | When to add |
 |---|---|---|
 | OCR (Tesseract) | Assume born-digital PDFs; OCR is a rabbit hole | If scanned docs matter (Sprint) |
-| Dedicated vector DB (Qdrant/Chroma) | pgvector suffices at single-paper scale | Multi-tenant corpus (production) |
+| Qdrant / production vector infra | Chroma is enough at demo scale (builder-familiar) | Multi-tenant corpus (production) |
 | Fine-tuning / QLoRA | Prompt + RAG + verification gets us there; training is time-expensive | If eval shows a specific gap (Sprint) |
 | Full video *rendering* (TTS + assembly) | High effort, low marginal jury value vs. script | Stretch module / Sprint |
 | Kubernetes, Prometheus/Grafana, MLflow | Compose + light logging is enough to demo | Production hardening |
