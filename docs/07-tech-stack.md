@@ -1,109 +1,138 @@
 # UniPress DE — Technology Stack
 
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`06-dataset-strategy.md`](06-dataset-strategy.md)
-> Concrete, justified technology choices. Resolves the open decisions from [`02-architecture.md`](02-architecture.md) §9 and [`03-ai-pipeline.md`](03-ai-pipeline.md) §9.
+> A production-oriented stack. Resolves the open decisions from [`02-architecture.md`](02-architecture.md) §9 and [`03-ai-pipeline.md`](03-ai-pipeline.md) §9.
 
 ---
 
-## 0. Selection criteria
+## 0. Engineering stance & selection criteria
 
-Every choice is scored against: **(a)** does it serve the trust/traceability goal, **(b)** can a solo dev ship it by 25 Sept, **(c)** does it keep the "locally deployable / no lock-in" story, **(d)** is it open-source where practical, **(e)** does it match the builder's existing strengths (Python, Node/Next.js, Docker, cloud). Frontier LLM quality is the one place we accept a hosted dependency — behind a gateway so it's swappable.
+This system is built the way a working engineer builds production software, not as a throwaway prototype. Choices are justified by **engineering merit**, not by which is easiest to stand up:
+
+- **Correctness & trust first** — the architecture exists to make output verifiable and auditable.
+- **Dev/prod parity** — the same Docker Compose stack runs locally and on the server; no "works on my machine."
+- **Async by design** — long-running ML/LLM work runs on a job queue, never blocking a request thread.
+- **Observable by default** — metrics, traces, and structured logs from day one; you cannot operate what you cannot see.
+- **Reproducible** — typed config, DB migrations, versioned eval runs; every result can be reproduced.
+- **A real scaling path** — every component has a documented graduation route (Compose → K8s, Chroma → Qdrant, Ollama → vLLM) without a rewrite.
+- **No gratuitous complexity** — components are included because they earn their place, and each is defended below. Familiar, proven tools are preferred over novel ones on a solo timeline.
+
+Frontier-LLM quality is the one accepted hosted dependency — behind a gateway so it is swappable and never a lock-in.
 
 ---
 
 ## 1. The stack at a glance
 
-| Layer | Choice | Why (one line) |
+| Layer | Choice | Engineering rationale |
 |---|---|---|
-| Frontend | **Next.js 14 (App Router) + React + TypeScript + Tailwind** | Builder's strength; polished evidence-review UI = the demo |
-| API | **FastAPI + Pydantic v2 + Uvicorn** | Typed structured outputs; async; Python-native AI |
-| Orchestration | **Plain Python services** (no heavy agent framework) | Deterministic pipeline > opaque agent magic |
-| PDF parsing | **PyMuPDF (fitz)** + **Docling** (fallback/structure) | Layout + coordinates for source spans |
-| Sci-PDF structure | **GROBID** (optional service) | Best section/reference parsing for papers |
-| Embeddings | **BGE-M3** (multilingual) via sentence-transformers | One model for HU + EN; strong retrieval |
-| Reranker | **bge-reranker-v2-m3** (optional) | Precision boost when needed |
-| NLI (TrustLayer T1) | **DeBERTa-v3 MNLI cross-encoder** | Fast local entailment; the cheap trust gate |
-| LLM gateway | **LiteLLM** | One API over providers; swappable, no lock-in |
-| LLM (generation) | **OpenAI (GPT-4o / GPT-4.1)** default; **local via Ollama** optional | Builder has OpenAI credits; quality by default; local fallback for privacy demo |
-| Vector store | **Chroma** (dedicated) | Purpose-built vector DB; builder has prior experience → lower risk |
-| Database | **PostgreSQL 16** | Claims, spans, metrics, provenance (relational) |
-| Object/file store | **Local FS** (MVP) → S3-compatible (**MinIO**) later | Simple now, cloud-ready path |
-| Templating/export | **Jinja2** + **WeasyPrint** (PDF), Markdown/HTML | Deterministic output rendering |
-| Eval | **RAGAS**, **textstat**, **sacrebleu/bert-score**, custom | Faithfulness, readability, sanity |
-| Experiment tracking | Files (MVP) → **MLflow** (competition+) | Reproducible metric runs |
-| Observability | **structlog** + Postgres metrics (MVP) → **OpenTelemetry** | Latency/cost/eval visibility |
-| Packaging | **uv** (Python), **pnpm** (JS) | Fast, reproducible installs |
-| Deployment | **Docker + Docker Compose** | One-command stack = "locally deployable" |
-| Reverse proxy / TLS | **Nginx + Certbot** | Builder's existing workflow; Let's Encrypt auto-renew |
-| CI | **GitHub Actions** (lint, test, build) | Cheap quality gate; MLOps-ready |
+| Frontend | **Next.js 14 (App Router) + TypeScript + Tailwind** | Type-safe UI; the evidence-review UX is the product |
+| API | **FastAPI + Pydantic v2 + Uvicorn/Gunicorn** | Typed contracts, async I/O, OpenAPI out of the box |
+| Config | **pydantic-settings** | 12-factor, typed, validated env config; no magic constants |
+| Async processing | **Celery + Redis** (workers) | Decouples long ML/LLM jobs from HTTP; retries, concurrency, backpressure |
+| Broker / cache | **Redis** | Task broker + result backend + memoization cache |
+| Task monitoring | **Flower** | Live queue/worker visibility |
+| Relational DB | **PostgreSQL 16** | Claims, spans, metrics, provenance — transactional, durable |
+| Migrations | **Alembic** | Versioned, reviewable schema changes |
+| Vector store | **Chroma** | Dedicated vector DB; builder-proven → lower delivery risk |
+| PDF parsing | **PyMuPDF** + **Docling** (structure) | Layout + coordinates for source spans |
+| Sci-PDF structure | **GROBID** (optional service) | Best-in-class section/reference parsing for papers |
+| Embeddings | **BGE-M3** (multilingual, local) | One model for HU + EN; on-prem; zero per-call cost |
+| Reranker | **bge-reranker-v2-m3** | Retrieval precision |
+| NLI (TrustLayer T1) | **DeBERTa-v3 MNLI** (local) | Fast, deterministic entailment gate |
+| LLM gateway | **LiteLLM** | Provider-agnostic; no lock-in; per-stage model routing |
+| LLM (generation) | **OpenAI (GPT-4o / GPT-4.1)** default; **Ollama** optional | Existing credits; local path for privacy demo |
+| Templating/export | **Jinja2** + **WeasyPrint** | Deterministic, testable output rendering |
+| Eval framework | **RAGAS**, **textstat**, custom metrics | Faithfulness, hallucination, readability |
+| Experiment tracking | **MLflow** | Versioned eval runs, params, metrics, artifacts |
+| Metrics | **Prometheus** + prometheus-fastapi-instrumentator | Latency, cost, hallucination-rate as live series |
+| Tracing | **OpenTelemetry** → **Tempo** | Distributed traces across API → worker → LLM |
+| Logs | **structlog** (JSON) → **Loki** (optional) | Structured, correlated by trace ID |
+| Dashboards | **Grafana** | Single pane: ops + eval metrics (a demo asset) |
+| Packaging | **uv** (Python), **pnpm** (JS) | Fast, lockfile-reproducible installs |
+| Reverse proxy / TLS | **Nginx + Certbot** | Builder's workflow; Let's Encrypt auto-renew |
+| Deployment | **Docker + Docker Compose** (profiles) | Dev/prod parity; profiled service groups |
+| CI/CD | **GitHub Actions** | Lint, type-check, test, **eval gate**, build/push, deploy |
+| Quality gates | **ruff + mypy + pre-commit + pytest** | Enforced standards, not aspirational ones |
 
 ---
 
 ## 2. Resolved decisions (from architecture §9 / pipeline §9)
 
-### 2.1 Parser — **PyMuPDF primary, GROBID optional**
-- **Decision:** Start with **PyMuPDF** for text + coordinates (fast, pip-installable, gives bounding boxes for UI highlighting). Add **GROBID** only if section/reference detection on the sample papers is weak.
-- **Why:** The sample papers are clean, born-digital, two-column Elsevier/IOP PDFs — PyMuPDF handles these well and avoids running a Java service on day one. Docling is the fallback for tricky layouts/tables.
-- **Trade-off:** GROBID gives superior academic structure but adds ops weight; defer until a real gap shows.
+### 2.1 Parser — **PyMuPDF primary, Docling/GROBID for structure**
+- **Decision:** PyMuPDF for text + coordinates (bounding boxes → UI highlight); Docling for complex layouts/tables; **GROBID** added if section/reference detection on the sample papers proves insufficient.
+- **Rationale:** Source spans require positional metadata; PyMuPDF delivers it reliably on born-digital PDFs. GROBID is world-class for academic structure but adds a JVM service, so it is introduced against a measured need, not preemptively.
 
 ### 2.2 Embedding model — **BGE-M3**
-- **Decision:** **BGE-M3** (multilingual, 100+ languages incl. Hungarian; supports dense + sparse + multi-vector).
-- **Why:** One model covers EN papers *and* HU curricula — critical for the bilingual requirement. Strong retrieval benchmarks, OSS, runs locally on CPU (keeps the privacy story + zero marginal cost).
-- **Alternative:** multilingual-e5-large (also good); **OpenAI `text-embedding-3-large`** is a trivial swap given the OpenAI credits, but BGE-M3 stays the default for multilingual/HU quality, local execution, and no per-embedding cost. Decide by a quick retrieval test on 1 EN + 1 HU doc.
+- **Decision:** BGE-M3 (multilingual incl. Hungarian; dense + sparse + multi-vector), served locally in the worker.
+- **Rationale:** One model satisfies the bilingual requirement, runs on-prem (privacy + zero marginal cost), and benchmarks strongly on multilingual retrieval. **OpenAI `text-embedding-3-large`** is a config-level swap given the credits, but local BGE-M3 is the stronger default for HU quality and data locality. Final pick confirmed by a retrieval A/B on 1 EN + 1 HU doc, tracked in MLflow.
 
-### 2.3 NLI model + threshold — **DeBERTa-v3 MNLI**, τ_high ≈ 0.85
-- **Decision:** A DeBERTa-v3-large MNLI/FEVER cross-encoder for Tier-1 entailment; contradiction cutoff 0.5, entail cutoff τ_high = 0.85 (tuned on the gold set).
-- **Why:** Small, fast, deterministic, runs local — the cheap gate that keeps most sentences off the LLM in verification. Multilingual NLI (e.g. mDeBERTa-XNLI) for HU output.
-- **Trade-off:** English MNLI models are strongest; for HU verification use **mDeBERTa-v3-XNLI**; if quality lags, escalate HU sentences to the Tier-2 LLM judge more aggressively.
+### 2.3 NLI model + thresholds — **DeBERTa-v3 MNLI**
+- **Decision:** DeBERTa-v3-large MNLI/FEVER cross-encoder for Tier-1 entailment; contradiction cutoff 0.5, entail cutoff τ_high = 0.85; **mDeBERTa-v3-XNLI** for Hungarian. Thresholds tuned on the gold set and versioned.
+- **Rationale:** A small, deterministic, local model is the correct instrument for a high-frequency grounding check — cheap, reproducible, and it keeps most sentences off the paid LLM judge.
 
-### 2.4 Hosted LLM (generation tier) — **OpenAI via LiteLLM**, swappable
-- **Decision:** Default generation on **OpenAI GPT-4o / GPT-4.1**; **Tier-2 verification judge on a cheaper model (gpt-4o-mini)** to control cost. An **Ollama-served local model** (e.g. Llama/Qwen) is the optional drop-in for the offline/privacy demo. All calls route through **LiteLLM**, so switching provider/model is a config change.
-- **Why:** The builder already has OpenAI credits, so it's the pragmatic default; generation quality and nuanced judging are what the jury sees. The LiteLLM gateway keeps the "no lock-in / locally deployable" narrative intact and enables the hosted-vs-local ablation in evaluation.
-- **Model split:** big model for generation (quality shows), mini model for the verification judge (runs often → cost-sensitive). Both configurable per stage.
-- **Cost control:** Tier-1 local NLI gating minimizes judge calls; extraction/generation cached per document; demo outputs pre-generated to avoid live rate limits.
+### 2.4 LLM (generation tier) — **OpenAI via LiteLLM**, per-stage routing
+- **Decision:** Generation on **GPT-4o / GPT-4.1**; **Tier-2 judge on gpt-4o-mini**; optional local **Ollama** model for the privacy demo. All calls route through **LiteLLM** with **per-stage model routing** and centralized retry/timeout/cost accounting.
+- **Rationale:** Existing OpenAI credits make it the pragmatic default; the gateway prevents lock-in, enables the hosted-vs-local ablation, and centralizes reliability concerns (timeouts, retries via `tenacity`, structured error handling). Big model where quality is visible, mini model where calls are frequent — a deliberate cost/quality allocation, not a shortcut.
 
-### 2.5 Confidence-score formula — implemented as in `03` §5.4
-- Weighted blend of NLI entailment + judge supported-fraction + numeric/entity overlap, with a hard numeric-mismatch penalty. Weights (`0.4/0.4/0.2`) and export threshold (`0.7`) are **config values**, tuned against the gold set.
+### 2.5 Confidence-score formula — per `03` §5.4
+- Weighted blend (NLI entailment + judge supported-fraction + numeric/entity overlap) with a hard numeric-mismatch penalty. Weights and export threshold are typed config, tuned against the frozen gold set, and the tuning run is logged to MLflow.
 
-### 2.6 Vector store — **Chroma** (chosen)
-- **Decision:** Use **Chroma** as a dedicated vector store, run as its own service (or embedded/persistent mode) alongside Postgres.
-- **Why:** The builder has prior hands-on experience with Chroma — for a solo build against a deadline, tool familiarity materially lowers delivery risk and speeds iteration. Chroma is open-source, runs locally (preserves the privacy/local-deploy story), and has a clean Python API and metadata filtering.
-- **Consequence:** Two data services (Postgres for relational/provenance, Chroma for vectors) instead of one. Accepted trade-off — the confidence/speed gain outweighs the extra container for a solo timeline.
-- **Alternatives considered:** pgvector (one fewer service, but a new tool for the builder); Qdrant (excellent, but no prior experience). Documented upgrade path to **Qdrant** if production scale/multi-tenancy demands it.
-- **Note:** Retrieval accesses vectors only through a thin `VectorStore` interface, so swapping Chroma → Qdrant later is a config/adapter change, not a rewrite.
+### 2.6 Vector store — **Chroma**
+- **Decision:** Chroma as a dedicated vector service.
+- **Rationale:** Builder has production experience with it → materially lower delivery risk on a solo timeline; open-source, on-prem, clean metadata filtering. Accessed only through a `VectorStore` port (hexagonal boundary), so graduating to **Qdrant** at production scale is an adapter swap, not a rewrite. Trade-off (a second data service alongside Postgres) is accepted as correct separation of concerns: relational data and vector indices have different scaling and backup profiles.
+
+### 2.7 Async processing — **Celery + Redis** (new, deliberate)
+- **Decision:** Ingestion → parsing → claim extraction → embedding → verification run as **Celery tasks** on dedicated worker containers, orchestrated as a chain with per-stage retries and idempotency keys. The API enqueues a job and returns immediately; the frontend tracks progress (poll/SSE). Redis is broker + result backend + memoization cache. **Flower** exposes queue/worker state.
+- **Rationale:** These stages take seconds-to-minutes and call external models — running them inside a request thread is an anti-pattern that fails under any real load. A queue gives retries, concurrency control, backpressure, horizontal worker scaling, and crash recovery. This is the single clearest signal of production engineering in the system.
+- **Alternative:** **Arq** (async-native, lighter) or **RQ**; Celery chosen for maturity, ecosystem, and recognizability. Documented as swappable behind a small task-dispatch interface.
+
+### 2.8 Observability — **OpenTelemetry + Prometheus + Tempo + Grafana** (new, day one)
+- **Decision:** Instrument API and workers with **OpenTelemetry** (traces + metrics); export via an **OTel Collector** to **Tempo** (traces) and **Prometheus** (metrics); visualize in **Grafana**. Structured JSON logs via **structlog**, correlated by trace ID (optionally shipped to **Loki**).
+- **What we measure:** per-stage latency, LLM token usage + cost, cache hit rate, queue depth, and — crucially — **live eval signals** (hallucination rate, faithfulness, coverage) as first-class metrics.
+- **Rationale:** Operability is a core engineering competency, and it is the builder's DevOps strength. Beyond good practice, the Grafana board turns the evaluation story into a **live dashboard** — one of the strongest possible demo visuals for a technical jury. Compose **profiles** keep the observability stack opt-in for lightweight local runs.
+
+### 2.9 Data & reproducibility — **Alembic + MLflow + pydantic-settings**
+- **Alembic:** every schema change is a reviewed, versioned migration — no ad-hoc `CREATE TABLE`.
+- **MLflow:** eval runs (params, metrics, artifacts, model/threshold versions) are tracked and comparable, so every reported number is reproducible and improvement is provable.
+- **pydantic-settings:** all config is typed and env-driven (12-factor); invalid config fails fast at boot.
 
 ---
 
-## 3. Why NOT (rejected options, briefly)
+## 3. Rejected options (with engineering reasoning)
 
 | Rejected | In favor of | Reason |
 |---|---|---|
-| LangChain / LlamaIndex as the backbone | Plain Python + thin helpers | Deterministic, debuggable pipeline; avoid framework churn/abstraction tax. May borrow small utilities only. |
-| pgvector (vectors inside Postgres) | Chroma | Builder's prior Chroma experience → lower delivery risk for a solo deadline |
-| Node/Nest backend | FastAPI | Keeps AI code in the Python ecosystem |
-| Streamlit/Gradio UI | Next.js | The evidence-review UX is the product + the demo; needs real frontend |
-| OpenAI/Cohere embeddings | BGE-M3 | Breaks the local/privacy story; multilingual OSS is strong enough |
-| Fine-tuning for MVP | Prompt + RAG + verification | Training time/complexity not justified yet (revisit for Sprint) |
-| Kubernetes for MVP | Docker Compose | Compose is enough to demo + claim local deployability |
-| Agent framework (CrewAI/AutoGen) | Explicit pipeline | Trust requires determinism, not autonomous agents |
+| LangChain / LlamaIndex as backbone | Explicit Python + thin ports | Determinism, debuggability, and testability of a trust-critical pipeline outweigh framework convenience; abstraction tax and version churn are real costs |
+| Synchronous request-time processing | Celery + Redis workers | Blocking a web thread on multi-second ML/LLM work does not survive load; queue gives retries/backpressure/scaling |
+| Vectors inside Postgres (pgvector) | Chroma | Builder-proven tool lowers risk; relational vs. vector workloads have distinct scaling/backup needs (separation of concerns) |
+| Print/log-only "monitoring" | OTel + Prometheus + Grafana | You cannot operate or demo what you cannot measure; observability is table stakes |
+| Ad-hoc schema changes | Alembic migrations | Reproducibility and safe rollback |
+| Streamlit/Gradio UI | Next.js | The evidence-review UX is the product and the demo; needs a real frontend |
+| Agent framework (CrewAI/AutoGen) | Explicit orchestration | Trust requires deterministic, inspectable control flow, not autonomous agents |
+| Kubernetes for the competition | Compose (profiles) on a VM | Compose is the right weight for one node; K8s is the documented production graduation, not premature ops burden |
+| Fine-tuning for MVP | Prompt + RAG + verification | Not justified until eval shows a specific, repeatable gap (then revisit for the Sprint) |
 
 ---
 
-## 4. Component → stack mapping (MVP / Competition / Production)
+## 4. Component → maturity mapping
 
-| Capability | MVP | Competition | Production |
-|---|---|---|---|
-| PDF parse + spans | PyMuPDF | + Docling/GROBID | + OCR (Tesseract) |
-| Embeddings | BGE-M3 (local) | same | GPU-served |
-| Vector store | Chroma | Chroma | Qdrant (scale) |
-| NLI verify | DeBERTa MNLI (local) | + mDeBERTa (HU) | fine-tuned |
-| Generation/judge | OpenAI via LiteLLM | + local Ollama option | vLLM cluster |
-| Frontend | Next.js | polished | same + auth |
-| Storage | local FS | local FS | MinIO/S3 |
-| Eval | files + RAGAS | + MLflow | CI-gated eval |
-| Observability | structlog + PG | + OpenTelemetry | Prometheus/Grafana |
-| Deploy | Docker Compose (local) | Compose on Angani VM + domain/TLS | K8s + Terraform |
-| CI | GitHub Actions | same | + eval gates |
+| Capability | Competition (built) | Production (graduation path) |
+|---|---|---|
+| PDF parse + spans | PyMuPDF + Docling (+GROBID if needed) | + OCR (Tesseract/PaddleOCR) |
+| Embeddings | BGE-M3 (CPU, local) | GPU-served / batched |
+| Vector store | Chroma | Qdrant (multi-tenant, HA) |
+| NLI verify | DeBERTa + mDeBERTa (local) | fine-tuned domain NLI |
+| Generation/judge | OpenAI via LiteLLM | + self-hosted vLLM |
+| Async jobs | Celery + Redis + Flower | Celery autoscaling / KEDA on K8s |
+| Frontend | Next.js | + SSO/auth, multi-tenant |
+| Storage | local FS via storage port | MinIO / S3 |
+| Migrations | Alembic | same, CI-gated |
+| Eval | RAGAS + custom + MLflow | eval as CD promotion gate |
+| Observability | OTel + Prometheus + Tempo + Grafana | + Loki, alerting, SLOs |
+| Deploy | Compose (profiles) on Angani VM + Nginx/Certbot | K8s + Terraform + Helm |
+| CI/CD | GitHub Actions (lint/type/test/eval/build/deploy) | + canary, rollback |
+
+Note: there is no "MVP-only throwaway" column — the MVP *is* the first slice of the production system, built on the production skeleton.
 
 ---
 
@@ -111,113 +140,141 @@ Every choice is scored against: **(a)** does it serve the trust/traceability goa
 
 ```
 unipress-de/
-├── docker-compose.yml          # postgres, chroma, api, frontend, [ollama], [grobid]
+├── docker-compose.yml            # profiles: core | observability | ml | local-llm
+├── docker-compose.override.yml   # local dev conveniences
 ├── .env.example
-├── api/                        # FastAPI service
-│   ├── pyproject.toml          # uv-managed
+├── .github/workflows/ci.yml      # lint, type, test, eval-gate, build, deploy
+├── .pre-commit-config.yaml
+├── api/                          # FastAPI service (thin: enqueue + read)
+│   ├── pyproject.toml            # uv-managed
+│   ├── alembic/                  # migrations
 │   ├── app/
-│   │   ├── ingestion/          # parse, chunk, spans
-│   │   ├── claims/             # extraction + store
-│   │   ├── retrieval/          # embeddings, chroma, rerank
-│   │   ├── generation/         # per-output-type generators
-│   │   ├── trustlayer/         # NLI + judge + scoring
-│   │   ├── outputs/            # renderers (Jinja2/WeasyPrint), bilingual
-│   │   ├── llm/                # LiteLLM gateway wrapper
-│   │   ├── eval/               # run_eval.py, metrics
-│   │   ├── models.py           # Pydantic contracts (from doc 03)
+│   │   ├── core/                 # settings (pydantic), logging, otel, deps
+│   │   ├── ingestion/            # parse, chunk, spans
+│   │   ├── claims/               # extraction + store
+│   │   ├── retrieval/            # embeddings, chroma port, rerank
+│   │   ├── generation/           # per-output-type generators
+│   │   ├── trustlayer/           # NLI + judge + scoring
+│   │   ├── outputs/              # renderers (Jinja2/WeasyPrint), bilingual
+│   │   ├── llm/                  # LiteLLM gateway (routing, retry, cost)
+│   │   ├── tasks/                # Celery app + task chains
+│   │   ├── eval/                 # run_eval.py, metrics, MLflow logging
+│   │   ├── telemetry/            # OTel + Prometheus wiring
+│   │   ├── models.py             # Pydantic contracts (doc 03)
 │   │   └── main.py
-│   └── tests/
-├── frontend/                   # Next.js app (upload, review, export)
-├── data/                       # manifest.yaml (committed); raw/ gitignored
-├── eval/                       # gold/, adversarial/, reports/
-└── docs/                       # this documentation set
+│   └── tests/                    # unit + integration
+├── worker/                       # Celery worker image (loads ML models)
+├── frontend/                     # Next.js app (upload, review, export)
+├── ops/
+│   ├── nginx/                    # server blocks
+│   ├── prometheus/  grafana/  tempo/  otel-collector/
+│   └── mlflow/
+├── data/                         # manifest.yaml (committed); raw/ gitignored
+├── eval/                         # gold/, adversarial/, reports/
+└── docs/
 ```
+
+**Architectural note:** the API is thin (validate → enqueue → read state); all heavy work lives in the worker. Ports/adapters (`VectorStore`, `LLMGateway`, `Storage`, `TaskDispatch`) keep infrastructure swappable and the domain testable.
 
 ---
 
 ## 6. Core dependencies (indicative)
 
-**Python (api):**
+**Python (api + worker):**
 ```
-fastapi, uvicorn[standard], pydantic>=2, sqlalchemy, psycopg[binary], chromadb,
+fastapi, uvicorn[standard], gunicorn, pydantic>=2, pydantic-settings,
+sqlalchemy, alembic, psycopg[binary], chromadb,
+celery, redis, flower,
 pymupdf, docling (optional), sentence-transformers, FlagEmbedding (BGE-M3),
-transformers, torch, litellm, openai, ragas, textstat, sacrebleu, bert-score,
-jinja2, weasyprint, structlog, python-multipart, tenacity, pytest
+transformers, torch (CPU wheel), litellm, openai, tenacity,
+ragas, textstat, mlflow,
+jinja2, weasyprint,
+opentelemetry-sdk, opentelemetry-instrumentation-fastapi,
+opentelemetry-instrumentation-celery, opentelemetry-exporter-otlp,
+prometheus-fastapi-instrumentator, structlog,
+pytest, pytest-asyncio, ruff, mypy
 ```
 **JS (frontend):** `next, react, typescript, tailwindcss, @tanstack/react-query, zod`
-**Infra:** `postgres:16`, `chromadb/chroma`, `ollama/ollama` (optional), `lfoppiano/grobid` (optional)
-**Tooling:** `uv`, `ruff`, `mypy`, `pnpm`, GitHub Actions
+**Infra images:** `postgres:16`, `chromadb/chroma`, `redis:7`, `prom/prometheus`, `grafana/grafana`, `grafana/tempo`, `otel/opentelemetry-collector`, `ghcr.io/.../mlflow`, `mher/flower`, `ollama/ollama` (optional), `lfoppiano/grobid` (optional)
+**Tooling:** `uv`, `pnpm`, `pre-commit`, GitHub Actions
 
 ---
 
-## 7. Hardware & runtime notes (solo, realistic)
+## 7. Runtime & capacity plan (Angani VM: 8 vCPU / 16 GB / 100 GB)
 
-- **Target server:** Angani cloud VM — **8 vCPU / 16 GB RAM / 100 GB SSD, Ubuntu 24.04** (see §9). Generous for Profile A; embeddings + NLI have plenty of CPU headroom.
-- **Embeddings + NLI** run on CPU comfortably for single-document workloads; BGE-M3 (~2–4 GB) and DeBERTa (~1.5–2 GB) load into RAM with room to spare on 16 GB.
-- **Generation** is API-bound (OpenAI) → **no GPU needed** for the default path. The optional local Ollama path would want a GPU (not present on this VM), so it stays a documented option rather than a live demo feature here.
-- **Everything comes up with `docker compose up`** — the single most important "it's real and deployable" signal for the jury.
+- **Compute profile:** Profile A (no GPU). Generation is API-bound (OpenAI). Local ML is embeddings + NLI, loaded **once in the worker**, not the API.
+- **Memory budget (approx):** worker ML models ~5–6 GB (BGE-M3 + DeBERTa + reranker) · Postgres/Redis/Chroma ~1.5 GB · observability stack (Prometheus/Grafana/Tempo/OTel) ~1.5–2 GB · MLflow/Flower/api/frontend ~1.5 GB · OS + headroom ~2 GB → fits 16 GB. Observability profile can be toggled off locally if needed.
+- **CPU:** 8 vCPU comfortably covers concurrent embedding/NLI on the worker plus the light infra services; Celery concurrency tuned to core count.
+- **Reliability:** health/readiness probes on api + worker; graceful shutdown drains in-flight tasks; Redis persistence for queue durability; nightly `pg_dump` + Chroma volume snapshot.
+- **`docker compose up` brings the whole system online** — dev/prod parity, and the clearest "this is real and operable" signal for the jury.
 
 ---
 
-## 8. Key risks in the stack (and mitigations)
+## 8. Quality engineering (CI/CD + testing)
 
-| Risk | Mitigation |
-|---|---|
-| WeasyPrint system deps (cairo/pango) fussy in Docker | Pin a known-good base image; HTML/Markdown export as fallback |
-| HU NLI quality weaker than EN | Escalate HU verification to Tier-2 LLM judge; report the gap honestly |
-| Frontier LLM cost/rate limits during demo | Cache aggressively; pre-generate demo outputs; local Ollama fallback |
-| Torch/CUDA image bloat | CPU-only torch wheel for MVP image; document GPU variant |
-| GROBID/Ollama add ops weight | Both optional/profiled in compose; core stack runs without them |
+- **Pre-commit:** ruff (lint+format), mypy (types), basic hygiene — fail before commit.
+- **CI (GitHub Actions):** lint → type-check → `pytest` (unit + integration against ephemeral Postgres/Redis/Chroma services) → **eval gate** (run the harness on a small fixed set; fail the build if hallucination rate regresses past threshold) → build & push images.
+- **CD (optional):** on `main`, SSH deploy to the Angani VM (`git pull` + `docker compose up -d --build`, run Alembic migrations). Matches the builder's CI/CD strength.
+- **Testing strategy:** unit tests for scoring/parsing/claim logic; integration tests for the task chain and API; golden-file tests for output rendering; the eval harness doubles as a regression guard.
+
+---
 
 ## 9. Deployment & infrastructure (Angani cloud)
 
 The system is **fully hosted** — nothing runs on the presenter's laptop during the demo. It is reached over the public internet at a `gilbertmutai.com` subdomain over HTTPS.
 
 ### 9.1 Server
-- **Provider:** Angani cloud (builder's employer).
-- **Spec:** 8 vCPU / 16 GB RAM / 100 GB SSD.
-- **OS:** Ubuntu Server 24.04 LTS.
-- **Runtime:** Docker Engine + Docker Compose (the same compose stack from local dev — dev/prod parity).
+- **Provider:** Angani cloud. **Spec:** 8 vCPU / 16 GB RAM / 100 GB SSD. **OS:** Ubuntu Server 24.04 LTS.
+- **Runtime:** Docker Engine + Docker Compose — the same stack (with profiles) used in local dev.
 
 ### 9.2 Public access + TLS + domain
-- **Reverse proxy: Nginx** in front of the stack — terminates TLS and routes to the frontend and API containers.
-- **TLS: Certbot (Let's Encrypt)** issues and auto-renews the certificate (`certbot --nginx` + the renewal timer). Chosen because the builder already uses Nginx + Certbot — lower delivery risk than a new tool.
-  - *Alternatives considered:* Caddy (automatic TLS, less config) or Traefik (label-driven); rejected in favor of the builder's existing Nginx/Certbot workflow.
-- **DNS:** add an **A record** for the chosen subdomain → the VM's public IP, in the `gilbertmutai.com` zone.
-- **Suggested subdomain:** `unipress.gilbertmutai.com` (frontend). API served under the same host at `/api` (single origin, no CORS hassle) — or `api.unipress.gilbertmutai.com` if we prefer split origins.
-- **Deployment note:** Nginx can run either as a container in the compose stack or directly on the host (host install pairs most naturally with `certbot --nginx`). Either works; host-Nginx is the more familiar path.
+- **Reverse proxy: Nginx** (host-installed) terminates TLS and routes to the frontend and API containers.
+- **TLS: Certbot (Let's Encrypt)** issues + auto-renews (`certbot --nginx` + systemd timer). Chosen to match the builder's existing workflow.
+- **DNS:** A record for the subdomain → VM public IP in the `gilbertmutai.com` zone.
+- **Suggested subdomain:** `unipress.gilbertmutai.com` (frontend); API under `/api` (single origin, no CORS). Grafana optionally at `/grafana` behind auth.
+- Port 80 open for the ACME HTTP-01 challenge and redirects to 443.
 
-### 9.3 Compose topology (production)
+### 9.3 Compose topology (production, profiled)
 ```mermaid
 flowchart TD
     NET[Internet] -->|443 HTTPS| NGINX[Nginx + Certbot<br/>reverse proxy + TLS]
     subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose"]
         NGINX --> FE[frontend: Next.js]
-        NGINX -->|/api| API[api: FastAPI]
-        API --> PG[(postgres)]
-        API --> CH[(chroma)]
-        API --> VOL[(persistent volumes:<br/>uploads, outputs, model cache)]
+        NGINX -->|/api| API[api: FastAPI · thin]
+        API --> RED[(Redis<br/>broker + cache)]
+        API --> PG[(Postgres)]
+        WK[worker: Celery<br/>ML models] --> RED
+        WK --> PG
+        WK --> CH[(Chroma)]
+        WK --> VOL[(volumes:<br/>uploads/outputs/model cache)]
+        subgraph OBS["profile: observability"]
+            OTEL[OTel Collector] --> PROM[Prometheus]
+            OTEL --> TEMPO[Tempo]
+            PROM --> GRAF[Grafana]
+            TEMPO --> GRAF
+        end
+        subgraph MLP["profile: ml"]
+            MLF[MLflow]
+        end
+        API -. traces/metrics .-> OTEL
+        WK -. traces/metrics .-> OTEL
+        WK -. eval runs .-> MLF
+        FLW[Flower] --> RED
     end
-    API -->|HTTPS| OA[OpenAI API]
+    WK -->|HTTPS| OA[OpenAI API]
 ```
 
-### 9.4 Persistence & data
-- **Named Docker volumes** for: Postgres data, Chroma data, uploaded PDFs, generated outputs, and the HF model cache (so BGE-M3/DeBERTa download once). These survive container restarts/redeploys.
-- 100 GB SSD budget: OS + Docker images (~15 GB incl. CPU-only torch) + model cache (~8 GB) + Postgres/Chroma (small) + uploads/outputs — comfortable.
+### 9.4 Persistence, security, ops
+- **Named volumes:** Postgres, Chroma, Redis (AOF), uploads, outputs, HF model cache, Grafana, MLflow artifacts.
+- **Firewall:** 80/443 + restricted SSH (22) only; all data services (Postgres/Redis/Chroma) stay on the internal Docker network, never published.
+- **Secrets:** `.env` on the server (git-ignored) — OpenAI key, DB/Redis creds, Grafana admin. Never in images or repo.
+- **Backups:** nightly `pg_dump` + Chroma/MLflow volume snapshots via cron.
+- **Redeploy:** `git pull` + `docker compose up -d --build` + `alembic upgrade head` (scripted; optionally via GitHub Actions).
 
-### 9.5 Security & ops
-- **Firewall:** allow 80/443 (web) and 22 (SSH, ideally restricted to known IPs); everything else closed. Inter-container traffic stays on the Docker network — Postgres/Chroma are **not** published to the host/internet.
-- **Secrets:** `.env` on the server (git-ignored) holds the **OpenAI API key**, DB credentials, etc. Never in the image or repo.
-- **HTTPS everywhere:** Nginx terminates TLS; Certbot issues + auto-renews the Let's Encrypt cert (renewal via the systemd timer / cron); app configured for the public origin. Port 80 is kept open for the ACME HTTP-01 challenge and redirects to 443.
-- **Backups:** periodic dump of Postgres + Chroma volume (cheap `cron` + `pg_dump`), given the eval/gold data matters.
-- **Updates/redeploy:** `git pull` + `docker compose up -d --build` on the VM; optional GitHub Actions → SSH deploy later (matches builder's CI/CD strength).
-
-### 9.6 Cost & availability
-- OpenAI usage billed to existing credits; Tier-1 NLI gating + caching + pre-generated demo outputs keep token spend low and remove live rate-limit risk during the presentation.
-- VM runs continuously through the competition window; the public URL means judges can try it themselves (a strong credibility signal vs. a laptop-only demo).
-
----
+### 9.5 Cost & demo safety
+- OpenAI billed to existing credits; Tier-1 NLI gating + Redis caching + pre-generated demo outputs keep spend low and remove live rate-limit risk.
+- Public URL means judges can try it themselves; the Grafana dashboard makes the system's operability and eval metrics visible in real time.
 
 ## Next phase
 
-**MVP Development Plan** (`08-dev-plan.md`) — the 12 phases as milestones with objectives, deliverables, tasks, definition-of-done, effort, dependencies, and risks — sequenced against the 25 Sept deadline.
+**MVP Development Plan** (`08-dev-plan.md`) — the phases as milestones (objectives, deliverables, tasks, definition-of-done, effort, dependencies, risks), sequenced against 25 Sept, built on this production skeleton.

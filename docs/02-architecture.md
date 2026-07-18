@@ -11,9 +11,9 @@ Every choice below serves five constraints, in priority order:
 
 1. **Trustworthy output** — the system's whole reason to exist is verifiable, evidence-linked content. Architecture optimizes for traceability first, cleverness second.
 2. **Demoable in 3 minutes** — the happy path (paper in → verified outputs out, with evidence side-by-side) must be fast and visually legible.
-3. **Solo-buildable by 25 Sept** — favor managed simplicity; cut anything not on the critical path.
+3. **Production-grade, solo-scoped** — built as the first slice of a real system (async workers, observability, migrations, CI/CD), not a throwaway prototype; scope is controlled by deferring features, not by cutting engineering rigor.
 4. **Locally deployable** — supports the "data protection / on-prem" narrative; nothing hard-wired to a single vendor.
-5. **MLOps-ready, not MLOps-heavy** — structured for observability/eval from day one, but we only turn on what earns its keep.
+5. **Observable & reproducible from day one** — metrics, traces, structured logs, versioned migrations, and tracked eval runs are built in, because retrofitting them is expensive and they are the builder's engineering strength.
 
 **North-star rule:** *No claim reaches the final output without a source span attached to it.* This is enforced structurally, not by prompt-hoping.
 
@@ -24,32 +24,37 @@ Every choice below serves five constraints, in priority order:
 ```mermaid
 flowchart TD
     U[Comms officer / researcher] -->|upload paper| FE[Next.js Frontend]
-    FE <-->|REST| API[FastAPI Backend]
+    FE <-->|REST · enqueue + read state| API[FastAPI Backend · thin]
+    API -->|enqueue job| Q[(Redis<br/>queue + cache)]
 
-    subgraph Core["UniPress Core"]
-        API --> ING[Ingestion & Parsing]
+    subgraph Worker["Celery Worker(s) · pipeline"]
+        ING[Ingestion & Parsing]
         ING --> CLM[Claim & Fact Extraction]
         CLM --> CS[(Claim Store<br/>Postgres)]
         ING --> CHUNK[Chunking + Embeddings]
         CHUNK --> VDB[(Vector DB<br/>Chroma)]
-        API --> GEN[Content Generation<br/>RAG + citation-aware]
+        GEN[Content Generation<br/>RAG + citation-aware]
         CS --> GEN
         VDB --> GEN
         GEN --> TL[TrustLayer<br/>verify + classify + score]
         CS --> TL
-        TL --> REV[Human Review Dashboard]
-        REV --> OUT[Bilingual Output Renderer]
     end
+
+    Q -->|dispatch| ING
+    TL --> REV[Human Review Dashboard]
+    REV --> OUT[Bilingual Output Renderer]
+    FE <-->|progress / review| REV
 
     GEN <-->|generation| LLM[LLM Gateway<br/>LiteLLM · swappable]
     TL <-->|LLM judge| LLM
     LLM -.-> HOSTED[OpenAI API<br/>default]
     LLM -.-> LOCAL[Local OSS LLM<br/>Ollama · optional]
 
-    API --> OBS[Observability<br/>logs + traces + eval metrics]
+    API -. traces/metrics .-> OBS[Observability<br/>OTel · Prometheus · Tempo · Grafana]
+    Worker -. traces/metrics .-> OBS
 ```
 
-**Plain English:** A user uploads a paper through the Next.js UI. FastAPI orchestrates a pipeline: the paper is parsed, its factual claims are extracted into a **Claim Store** (each with a source span), and its text is chunked and embedded into a **Vector DB**. When the user requests outputs, the **Generation** stage produces content grounded in retrieved chunks and the claim store. **TrustLayer** then checks every generated sentence against the source, classifies it, and scores confidence. The result goes to a **Review Dashboard** where the officer accepts/edits/flags, and finally the **Output Renderer** produces the bilingual deliverables. A single **LLM Gateway** abstracts whether generation runs on a hosted or local model.
+**Plain English:** A user uploads a paper through the Next.js UI. The **API stays thin** — it validates the request, enqueues a job on **Redis**, and returns immediately; the frontend tracks progress. A **Celery worker** runs the pipeline: the paper is parsed, its factual claims are extracted into a **Claim Store** (each with a source span), and its text is chunked and embedded into a **Vector DB**. When outputs are requested, the **Generation** stage produces content grounded in retrieved chunks and the claim store. **TrustLayer** then checks every generated sentence against the source, classifies it, and scores confidence. The result goes to a **Review Dashboard** where the officer accepts/edits/flags, and the **Output Renderer** produces the bilingual deliverables. A single **LLM Gateway** abstracts the model provider. Every service emits **traces and metrics** to the observability stack. Running the heavy work on workers (not in the request thread) is what lets the system stay responsive and recover from failures — a deliberate production choice, detailed in §2.14.
 
 ---
 
@@ -140,11 +145,18 @@ For each component: **purpose · why needed · recommended tech · alternatives 
 - **Alternatives:** Hard-code one provider (kills the hybrid narrative — avoid).
 - **Trade-offs:** A small abstraction cost now buys the entire "locally deployable, no lock-in" story and easy A/B of models in eval.
 
-### 2.13 Observability & Evaluation hooks
-- **Purpose:** Log every stage, trace latency/cost per request, capture eval metrics (faithfulness, hallucination rate, coverage, reviewer decisions).
-- **Why needed:** "Evaluate seriously, not by vibes" (your brief) + MLOps-ready posture.
-- **Recommended (MVP):** Structured logging + a metrics table in Postgres + a simple dashboard page. **(Competition+):** OpenTelemetry traces; **(Production):** Prometheus + Grafana, MLflow for eval runs.
-- **Trade-offs:** Keep it light for MVP; the *hooks* matter more than the heavy stack now.
+### 2.13 Observability & Evaluation
+- **Purpose:** Trace every stage across API and workers; expose latency, LLM token cost, cache hit rate, and queue depth as metrics; surface **live eval signals** (hallucination rate, faithfulness, coverage) as first-class series; keep structured, trace-correlated logs.
+- **Why needed:** Operability is a core engineering competency — you cannot run or trust what you cannot measure. It also makes the evaluation story *visible*: a Grafana board is one of the strongest demo assets for a technical jury.
+- **Recommended:** **OpenTelemetry** instrumentation → **OTel Collector** → **Prometheus** (metrics) + **Tempo** (traces), visualized in **Grafana**; **structlog** JSON logs (optionally to **Loki**); **MLflow** for versioned eval runs.
+- **Trade-offs:** Adds several infra containers, isolated behind a Compose `observability` profile so lightweight local runs can opt out. Included from day one — retrofitting observability is expensive and it is the builder's DevOps strength.
+
+### 2.14 Async processing — Job queue + workers
+- **Purpose:** Run ingestion → parsing → claim extraction → embedding → verification as a **Celery task chain** on dedicated workers, so multi-second/minute ML and LLM work never blocks a request thread.
+- **Why needed:** Synchronous request-time processing is a production anti-pattern — it collapses under concurrency, has no retry story, and loses work on crashes. A queue provides retries, idempotency, concurrency control, backpressure, crash recovery, and horizontal worker scaling. This is the clearest structural signal that the system is engineered for real use.
+- **Recommended:** **Celery** (broker/result backend = **Redis**, which also serves as a memoization cache); **Flower** for live queue/worker visibility. Task chain with per-stage retries and idempotency keys.
+- **Alternatives:** **Arq** (async-native, lighter) or **RQ**; Celery chosen for maturity, ecosystem, and recognizability. Task dispatch sits behind a small interface, so the engine is swappable.
+- **Trade-offs:** Adds a worker container + Redis; accepted as correct architecture. The API becomes thin (enqueue + read state), which also improves testability and horizontal scaling.
 
 ---
 
@@ -221,19 +233,24 @@ flowchart LR
 ```mermaid
 flowchart TD
     NET[Internet] -->|443 HTTPS<br/>unipress.gilbertmutai.com| NGINX[Nginx + Certbot<br/>reverse proxy + TLS]
-    subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose"]
+    subgraph VM["Angani VM · Ubuntu 24.04 · Docker Compose (profiled)"]
         NGINX --> FEc[frontend: next.js]
-        NGINX -->|/api| APIc[api: fastapi]
-        APIc --> DBc[(postgres:<br/>claims/spans/metrics)]
-        APIc --> CHc[(chroma:<br/>vectors)]
-        APIc --> VOL[(volumes:<br/>uploads/outputs/model cache)]
-        OLc[ollama: optional]
-        GRc[grobid: optional]
-        APIc -. optional .-> OLc
-        APIc -. optional .-> GRc
+        NGINX -->|/api| APIc[api: fastapi · thin]
+        APIc --> REDc[(redis:<br/>queue + cache)]
+        APIc --> DBc[(postgres)]
+        WKc[worker: celery · ML models] --> REDc
+        WKc --> DBc
+        WKc --> CHc[(chroma:<br/>vectors)]
+        WKc --> VOL[(volumes:<br/>uploads/outputs/model cache)]
+        OBSc[[observability profile:<br/>OTel · Prometheus · Tempo · Grafana]]
+        MLc[[ml profile: MLflow]]
+        APIc -. traces/metrics .-> OBSc
+        WKc -. traces/metrics .-> OBSc
+        WKc -. eval runs .-> MLc
     end
-    APIc -->|HTTPS| EXT[OpenAI API]
+    WKc -->|HTTPS| EXT[OpenAI API]
 ```
+> Full profiled topology (Flower, optional Ollama/GROBID, volumes) in [`07-tech-stack.md`](07-tech-stack.md) §9.3.
 
 - **MVP (local dev):** `docker compose up` brings the whole system up on one machine — dev/prod parity.
 - **Competition (deployed):** the **same compose stack on an Angani cloud VM** (8 vCPU / 16 GB / 100 GB, Ubuntu 24.04), fronted by **Nginx + Certbot** for HTTPS, reachable at a **`gilbertmutai.com` subdomain**. Nothing runs on the presenter's laptop — judges can open the URL themselves. Full details in [`07-tech-stack.md`](07-tech-stack.md) §9.
@@ -252,40 +269,48 @@ flowchart TD
 
 ---
 
-## 7. Deliberate exclusions (what a solo MVP does NOT build)
+## 7. Deliberate exclusions (scoped out, on purpose)
 
-Per your brief — *only include what's justified.* Explicitly cut for MVP, with rationale:
+*Only include what's justified* — but note the bar is "engineered for production," not "minimal MVP." What we deliberately defer, with rationale:
 
 | Excluded | Why not now | When to add |
 |---|---|---|
-| OCR (Tesseract) | Assume born-digital PDFs; OCR is a rabbit hole | If scanned docs matter (Sprint) |
-| Qdrant / production vector infra | Chroma is enough at demo scale (builder-familiar) | Multi-tenant corpus (production) |
-| Fine-tuning / QLoRA | Prompt + RAG + verification gets us there; training is time-expensive | If eval shows a specific gap (Sprint) |
-| Full video *rendering* (TTS + assembly) | High effort, low marginal jury value vs. script | Stretch module / Sprint |
-| Kubernetes, Prometheus/Grafana, MLflow | Compose + light logging is enough to demo | Production hardening |
+| OCR (Tesseract/PaddleOCR) | Sample corpus is born-digital; OCR is a rabbit hole | If scanned docs matter (Sprint) |
+| Qdrant / HA vector infra | Chroma is right-sized for demo scale (builder-proven); swap is an adapter | Multi-tenant/HA corpus (production) |
+| Fine-tuning / QLoRA | Prompt + RAG + verification suffices; train only against a measured gap | If eval shows a specific gap (Sprint) |
+| Full video *rendering* (TTS + assembly) | High effort, low marginal jury value vs. a strong script | Stretch module / Sprint |
+| Kubernetes + Terraform + Helm | Compose (profiled) is correct for one node; K8s is the documented graduation, not premature ops | Production / multi-node |
+| self-hosted vLLM cluster | OpenAI via gateway meets quality now; Ollama covers the local demo | Production model serving |
 | Multi-document / cross-paper synthesis | Single-paper is a cleaner, stronger demo | Sprint feature |
-| Auth / multi-user | Single-user demo; adds no jury value | Production |
+| Auth / multi-user / SSO | Single-officer demo; adds no jury value yet | Production |
+
+**Included and built** (not deferred, because they define production-grade): async job queue (Celery/Redis), full observability (OTel/Prometheus/Tempo/Grafana), MLflow eval tracking, Alembic migrations, CI/CD with an eval gate. These are table stakes for an experienced engineer, not extras.
 
 **Video note:** MVP delivers a polished **video script** (timed, scene-by-scene). Actual video generation (TTS voiceover + captioned assembly) is a clearly-scoped *stretch* module — impressive on camera, but never at the expense of the trust core.
 
 ---
 
-## 8. MVP / Competition / Production split (summary)
+## 8. Competition / Production split (summary)
 
-| Capability | MVP | Competition | Production |
-|---|:--:|:--:|:--:|
-| PDF parse + spans | ✅ | ✅ | ✅ + OCR |
-| Claim extraction (quote-verified) | ✅ | ✅ | ✅ |
-| RAG generation (claim-bound) | ✅ | ✅ | ✅ |
-| TrustLayer (NLI + judge + score) | ✅ | ✅ ➕ deeper | ✅ |
-| Evidence-linked review UI | ✅ | ✅ polished | ✅ |
-| Outputs: press/article/social/exec/script | ✅ | ✅ | ✅ |
-| Bilingual HU + EN | ✅ | ✅ | ✅ + more langs |
-| Evaluation harness | basic | ✅ full | ✅ CI-gated |
-| Local + hosted LLM (gateway) | ✅ | ✅ | ✅ vLLM |
-| Video rendering | — | stretch | ✅ |
-| Deploy | Compose | Compose+VM | K8s+Terraform |
-| Observability | logs+table | +OTel | Prom/Grafana/MLflow |
+The competition build *is* the first slice of the production system — there is no throwaway tier.
+
+| Capability | Competition (built) | Production (graduation) |
+|---|:--:|:--:|
+| PDF parse + spans | ✅ | + OCR |
+| Claim extraction (quote-verified) | ✅ | ✅ |
+| RAG generation (claim-bound) | ✅ | ✅ |
+| TrustLayer (NLI + judge + score) | ✅ | fine-tuned NLI |
+| Evidence-linked review UI | ✅ | + auth/multi-tenant |
+| Outputs: press/article/social/exec/script | ✅ | ✅ |
+| Bilingual HU + EN | ✅ | + more languages |
+| Async job queue (Celery/Redis) | ✅ | autoscaling / KEDA |
+| Evaluation harness + MLflow | ✅ | eval as CD gate |
+| Observability (OTel/Prom/Tempo/Grafana) | ✅ | + Loki, alerting, SLOs |
+| CI/CD (lint/type/test/eval/build/deploy) | ✅ | + canary/rollback |
+| LLM via gateway (OpenAI + Ollama) | ✅ | + self-hosted vLLM |
+| Migrations (Alembic) | ✅ | CI-gated |
+| Video rendering | stretch | ✅ |
+| Deploy | Compose (profiles) on VM + Nginx/Certbot | K8s + Terraform |
 
 ---
 
