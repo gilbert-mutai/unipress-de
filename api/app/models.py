@@ -42,6 +42,7 @@ class DocumentRead(BaseModel):
     status: JobStatus
     page_count: int | None = None
     chunk_count: int | None = None
+    claim_count: int | None = None
     language: str | None = None
     warnings: list[str] | None = None
     error: str | None = None
@@ -61,3 +62,36 @@ class ChunkRead(BaseModel):
     bbox: list[float] | None = None
     text: str
     token_estimate: int
+
+
+class ClaimRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    key: str
+    text: str
+    claim_type: str
+    page: int
+    section: str | None = None
+    char_start: int
+    char_end: int
+    quote: str
+    bbox: list[float] | None = None
+    entities: list[str] | None = None
+    importance: float
+    numeric: bool
+
+
+class SearchQuery(BaseModel):
+    query: str = Field(min_length=1, max_length=1000)
+    k: int = Field(default=8, ge=1, le=50)
+
+
+class SearchHit(BaseModel):
+    chunk_id: str
+    page: int
+    section: str | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    score: float  # 1 - distance (higher = more relevant)
+    text: str

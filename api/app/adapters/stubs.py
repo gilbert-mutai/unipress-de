@@ -1,28 +1,15 @@
-"""In-memory / trivial adapters so the skeleton runs without real infra.
+"""Trivial adapters so the skeleton runs without real infra.
 
-Each is replaced by a production adapter in a later phase, behind the same port:
-  InMemoryVectorStore -> ChromaVectorStore
-  EchoLLM             -> LiteLLMGateway
-  LocalStorage        -> S3Storage
-  CeleryTaskDispatch  -> (kept; Celery is the production choice)
+Each is replaced by a production adapter behind the same port:
+  EchoLLM      -> LiteLLMGateway (app/llm/gateway.py, done)
+  LocalStorage -> S3Storage
+  CeleryTaskDispatch -> (kept; Celery is the production choice)
+The VectorStore adapters live in app/retrieval/ (InMemoryVectorStore, ChromaVectorStore).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-
-class InMemoryVectorStore:
-    def __init__(self) -> None:
-        self._store: dict[str, list[str]] = {}
-
-    def upsert(self, doc_id: str, chunks: list[str]) -> int:
-        self._store.setdefault(doc_id, []).extend(chunks)
-        return len(chunks)
-
-    def query(self, text: str, k: int = 5) -> list[str]:
-        hits = [c for chunks in self._store.values() for c in chunks if text.lower() in c.lower()]
-        return hits[:k]
 
 
 class EchoLLM:

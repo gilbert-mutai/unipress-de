@@ -17,6 +17,10 @@ dependencies = [
     "flower>=2.0",
     "pymupdf>=1.24",
     "python-multipart>=0.0.12",
+    "litellm>=1.50",
+    "torch>=2.2",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
     "structlog>=24.4",
     "tenacity>=9.0",
     "prometheus-fastapi-instrumentator>=7.0",
@@ -35,6 +39,16 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28",
 ]
+
+# CPU-only torch (docs/07): avoids multi-GB CUDA wheels. sentence-transformers
+# pulls torch; force it to resolve from PyTorch's CPU index.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]
