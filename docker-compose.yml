@@ -1,0 +1,174 @@
+# UniPress DE — service topology (dev/prod parity via profiles).
+#   docker compose --profile core up                     # app only
+#   docker compose --profile core --profile observability up   # + OTel/Prom/Tempo/Grafana
+# Profiles: core | observability | ml | local-llm
+name: unipress-de
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-unipress}:${POSTGRES_PASSWORD:-unipress}@postgres:5432/${POSTGRES_DB:-unipress}
+  REDIS_URL: redis://redis:6379/0
+  OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-unipress}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+
+services:
+  # --- core -----------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    profiles: [core]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unipress}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unipress}
+      POSTGRES_DB: ${POSTGRES_DB:-unipress}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unipress} -d ${POSTGRES_DB:-unipress}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7
+    profiles: [core]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # One-shot: apply migrations before api/worker start.
+  migrate:
+    build: ./api
+    profiles: [core]
+    command: ["alembic", "upgrade", "head"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./api
+    profiles: [core]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  # Same image as api, different entrypoint. Splits into an ML-heavy image once
+  # embeddings/NLI land (see docs/07 §5, docs/08 P0 note).
+  worker:
+    build: ./api
+    profiles: [core]
+    command: ["celery", "-A", "app.tasks.celery_app.celery", "worker", "--loglevel=INFO", "--concurrency=2"]
+    environment: *app-env
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  flower:
+    build: ./api
+    profiles: [core]
+    command: ["celery", "-A", "app.tasks.celery_app.celery", "flower", "--port=5555"]
+    environment: *app-env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    profiles: [core]
+    environment:
+      # Server-side (SSR/route handlers) reach the api over the compose network.
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+
+  # --- observability --------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    profiles: [observability]
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./ops/otel-collector/config.yaml:/etc/otel/config.yaml:ro
+    depends_on:
+      - tempo
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: [observability]
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-remote-write-receiver"
+
+  tempo:
+    image: grafana/tempo:2.7.0
+    profiles: [observability]
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./ops/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempodata:/var/tempo
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+
+  # --- ml (eval tracking) ---------------------------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.19.0
+    profiles: [ml]
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=sqlite:////mlflow/mlflow.db
+      - --artifacts-destination=/mlflow/artifacts
+    volumes:
+      - mlflowdata:/mlflow
+
+  # --- local-llm (privacy demo) --------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [local-llm]
+    volumes:
+      - ollamadata:/root/.ollama
+
+volumes:
+  pgdata:
+  redisdata:
+  tempodata:
+  grafanadata:
+  mlflowdata:
+  ollamadata:
