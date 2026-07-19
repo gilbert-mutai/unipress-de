@@ -58,6 +58,7 @@ uploads/
 outputs/
 tmp/
 scratch/
+var/
 
 # --- Docker / infra local state ---
 *.local.yml

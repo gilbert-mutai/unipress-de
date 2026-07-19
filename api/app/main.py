@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from app.api import health, jobs
+from app.api import documents, health, jobs
 from app.core.logging import configure_logging, get_logger
 from app.core.settings import get_settings
 from app.core.telemetry import setup_tracing
@@ -39,6 +39,7 @@ except Exception as exc:  # noqa: BLE001 - never let telemetry break boot
 
 app.include_router(health.router)
 app.include_router(jobs.router)
+app.include_router(documents.router)
 
 
 @app.get("/", include_in_schema=False)

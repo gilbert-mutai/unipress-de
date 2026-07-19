@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://localhost:6379/0")
 
+    # Blob storage root for uploaded PDFs + parse artifacts (shared api/worker volume).
+    storage_root: str = Field(default="./var/storage")
+
     # Observability. Empty endpoint => OTLP export disabled (spans stay no-op).
     otel_service_name: str = Field(default="unipress")
     otel_exporter_otlp_endpoint: str = Field(default="")
