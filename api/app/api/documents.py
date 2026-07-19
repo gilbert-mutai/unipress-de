@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
-from app.db_models import Chunk, Document, Job
-from app.models import ChunkRead, DocumentRead
+from app.db_models import Chunk, Claim, Document, Job
+from app.models import ChunkRead, ClaimRead, DocumentRead
 from app.ports import Storage
 
 from .deps import get_storage
@@ -68,4 +68,13 @@ def get_chunks(document_id: str, db: Session = Depends(get_db)) -> list[Chunk]:
         raise HTTPException(status_code=404, detail="document not found")
     return list(
         db.scalars(select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.index))
+    )
+
+
+@router.get("/{document_id}/claims", response_model=list[ClaimRead])
+def get_claims(document_id: str, db: Session = Depends(get_db)) -> list[Claim]:
+    if db.get(Document, document_id) is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return list(
+        db.scalars(select(Claim).where(Claim.document_id == document_id).order_by(Claim.key))
     )

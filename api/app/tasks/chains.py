@@ -96,7 +96,21 @@ def task_chunk(prev: object, job_id: str, document_id: str) -> str:
     except Exception as exc:
         _fail(job_id, document_id, exc)
         raise
-    _set(job_id, result=f"ingested: {n} chunks")
+    _set(job_id, result=f"chunked: {n} chunks")
+    return job_id
+
+
+@celery.task(name="ingest.extract")
+def task_extract(prev: object, job_id: str, document_id: str) -> str:
+    from app.claims.service import extract_stage
+
+    _set(job_id, stage="extract")
+    try:
+        n = extract_stage(document_id)
+    except Exception as exc:
+        _fail(job_id, document_id, exc)
+        raise
+    _set(job_id, result=f"extracted: {n} claims")
     return job_id
 
 
@@ -124,6 +138,7 @@ def start_ingestion(job_id: str, document_id: str) -> str:
     workflow = chain(
         task_parse.si(job_id, document_id),
         task_chunk.s(job_id, document_id),
+        task_extract.s(job_id, document_id),
         ingest_finalize.s(job_id, document_id),
     )
     return workflow.apply_async().id

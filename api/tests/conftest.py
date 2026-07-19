@@ -21,7 +21,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
 
     from app.core import db
     from app.core.settings import get_settings
-    from app.db_models import Document, Job  # noqa: F401 - ensure tables register
+    from app.db_models import Claim, Document, Job  # noqa: F401 - ensure tables register
 
     db.Base.metadata.create_all(engine)
     monkeypatch.setattr(db, "SessionLocal", TestingSession)
@@ -43,10 +43,12 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
 
     # Real ingestion pipeline: run parse + chunk inline (no Celery/Redis).
     def _fake_ingest(self: object, job_id: str, document_id: str) -> str:
+        from app.claims.service import extract_stage
         from app.ingestion.service import chunk_stage, parse_stage
 
         parse_stage(document_id)
         chunk_stage(document_id)
+        extract_stage(document_id)
         with db.session_scope() as s:
             job = s.get(Job, job_id)
             if job is not None:

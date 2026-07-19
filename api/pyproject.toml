@@ -17,6 +17,7 @@ dependencies = [
     "flower>=2.0",
     "pymupdf>=1.24",
     "python-multipart>=0.0.12",
+    "litellm>=1.50",
     "structlog>=24.4",
     "tenacity>=9.0",
     "prometheus-fastapi-instrumentator>=7.0",

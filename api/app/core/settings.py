@@ -29,8 +29,13 @@ class Settings(BaseSettings):
     # this stays empty; local dev needs the frontend origin allowed.
     cors_origins: list[str] = Field(default=["http://localhost:3000"])
 
-    # LLM (unused until the generation phase).
+    # LLM. Extraction defaults to the deterministic heuristic; the LLM path is
+    # opt-in (requires BOTH the flag and a key) so no spend happens by accident.
     openai_api_key: str = Field(default="")
+    llm_extraction: bool = Field(default=False)
+    llm_extract_model: str = Field(default="gpt-4o-mini")
+    llm_judge_model: str = Field(default="gpt-4o-mini")
+    llm_generation_model: str = Field(default="gpt-4o")
 
     @property
     def otel_enabled(self) -> bool:
