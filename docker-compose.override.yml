@@ -1,0 +1,27 @@
+# Local dev conveniences — automatically merged by `docker compose` on top of
+# docker-compose.yml. Publishes ports to the host; not used in production.
+services:
+  api:
+    ports:
+      - "8000:8000"   # http://localhost:8000  (OpenAPI at /docs)
+  flower:
+    ports:
+      - "5555:5555"   # http://localhost:5555
+  frontend:
+    ports:
+      - "3000:3000"   # http://localhost:3000
+    environment:
+      # Browser-side calls during local dev hit the api directly.
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+  prometheus:
+    ports:
+      - "9090:9090"
+  grafana:
+    ports:
+      - "3001:3000"   # http://localhost:3001  (admin / $GRAFANA_ADMIN_PASSWORD)
+  tempo:
+    ports:
+      - "3200:3200"
+  mlflow:
+    ports:
+      - "5000:5000"

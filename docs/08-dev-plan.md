@@ -24,7 +24,7 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 
 | # | Phase | Weeks | Dates (2026) | Focus | Cumulative days |
 |---|---|---|---|---|---|
-| **P0** | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 |
+| **P0** ✅ | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 |
 | **P1** | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG | 15 |
 | **P2** | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
 | **P3** | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
@@ -81,6 +81,8 @@ gantt
 - CI is green on `main`; one end-to-end trace (api → worker) is visible in Tempo.
 
 **Risks:** dependency/version friction (torch CPU wheel, WeasyPrint system libs) → pin versions, bake into images early. Docker resource pressure on the dev machine → use profiles to run lean locally.
+
+**Status — ✅ delivered (19 Jul 2026).** Repo scaffolded (`api/`, `worker/`, `frontend/`, `ops/`); Compose profiles (`core | observability | ml | local-llm`) validate; api+worker share one image (ML split deferred, see `worker/README.md`); Alembic `0001_initial` creates the `jobs` table; the four ports ship with stub adapters; `/health` + `/ready` live; the demo Celery chain (`ingest → parse → embed → verify → finalize`) runs. **Verified live:** `docker compose --profile core up` healthy, a job round-trips API → Celery → Postgres to `done`, worker logs each stage as structured JSON. Backend CI-clean (ruff, mypy, 6 pytest); frontend type-checks + builds. **Deferred to a follow-up within P1:** confirming the api→worker trace lands in Tempo (instrumentation is wired), and the dev-convenience code bind-mount/hot-reload.
 
 ---
 
