@@ -19,9 +19,10 @@ def test_get_missing_job(client: TestClient) -> None:
     assert r.status_code == 404
 
 
-def test_ports_satisfied_by_stubs() -> None:
-    from app.adapters.stubs import EchoLLM, InMemoryVectorStore, LocalStorage
+def test_ports_satisfied_by_adapters() -> None:
+    from app.adapters.stubs import EchoLLM, LocalStorage
     from app.ports import LLMGateway, Storage, VectorStore
+    from app.retrieval.memory_store import InMemoryVectorStore
 
     assert isinstance(InMemoryVectorStore(), VectorStore)
     assert isinstance(EchoLLM(), LLMGateway)

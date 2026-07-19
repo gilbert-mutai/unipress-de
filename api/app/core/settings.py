@@ -21,6 +21,20 @@ class Settings(BaseSettings):
     # Blob storage root for uploaded PDFs + parse artifacts (shared api/worker volume).
     storage_root: str = Field(default="./var/storage")
 
+    # Retrieval / embeddings.
+    #   embed_backend: "sentence-transformers" (real) | "hashing" (deterministic, tests)
+    #   embed_model: multilingual-e5-small by default (HU+EN, ~470MB); BGE-M3 is a
+    #   drop-in swap on the VM (docs/07 §2.2). embed_dim only used by the hashing stub.
+    embed_backend: str = Field(default="sentence-transformers")
+    embed_model: str = Field(default="intfloat/multilingual-e5-small")
+    embed_dim: int = Field(default=384)
+    # Vector store: "chroma" (HTTP when chroma_url set, else local persistent at
+    # chroma_path) or "memory" (single-process; tests).
+    vector_backend: str = Field(default="chroma")
+    chroma_url: str = Field(default="")
+    chroma_path: str = Field(default="./var/chroma")
+    retrieval_top_k: int = Field(default=8)
+
     # Observability. Empty endpoint => OTLP export disabled (spans stay no-op).
     otel_service_name: str = Field(default="unipress")
     otel_exporter_otlp_endpoint: str = Field(default="")

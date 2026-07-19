@@ -1,10 +1,10 @@
 # UniPress DE — Project Structure
 
 > Documentation of the repository layout, components, and data flow.
-> **Reflects the codebase as of Phase 1b.** The full production stack runs
-> end-to-end (Phase 0); real **PDF ingestion → parsing (spans/bbox) → chunking**
-> (1a) and **quote-verified claim extraction** (1b) are implemented and verified.
-> Retrieval (embeddings/Chroma), generation, and the TrustLayer are still ahead —
+> **Reflects the codebase as of Phase 1c.** The full production stack runs
+> end-to-end (Phase 0); real **PDF ingestion → chunking** (1a), **quote-verified
+> claim extraction** (1b), and **embeddings → Chroma retrieval + semantic search**
+> (1c) are implemented and verified. Generation and the TrustLayer are still ahead —
 > see the [Status & maturity](#status--maturity) section. Everything below is
 > based on the actual committed files, not planned features.
 >
@@ -62,12 +62,18 @@ unipress-de/
 │   │   │   ├── heuristic.py     #   Deterministic extractor (no LLM; default)
 │   │   │   ├── llm_extractor.py #   Schema-constrained LLM extractor (opt-in)
 │   │   │   └── service.py       #   extract_stage (choose extractor, persist claims)
+│   │   ├── retrieval/           # Embed chunks + semantic search (the RAG 'R')
+│   │   │   ├── types.py         #   VectorHit
+│   │   │   ├── embedder.py      #   SentenceTransformer (e5-small) + hashing stub
+│   │   │   ├── memory_store.py  #   InMemoryVectorStore (tests/local)
+│   │   │   ├── chroma_store.py  #   ChromaVectorStore (production)
+│   │   │   └── service.py       #   embed_stage + search + store/embedder factories
 │   │   ├── llm/                 # LLM access
 │   │   │   └── gateway.py       #   LiteLLMGateway (LLMGateway port; retry/timeout)
 │   │   ├── ports/               # Hexagonal interfaces (Protocols)
 │   │   │   └── base.py          #   VectorStore, LLMGateway, Storage, TaskDispatch
 │   │   ├── adapters/            # Concrete implementations of the ports
-│   │   │   └── stubs.py         #   In-memory / echo / local-FS / Celery stubs
+│   │   │   └── stubs.py         #   EchoLLM / LocalStorage / CeleryTaskDispatch stubs
 │   │   └── tasks/               # Async processing
 │   │       ├── celery_app.py    #   ★ Celery worker entry point
 │   │       └── chains.py        #   Demo chain + ingestion chain (parse→chunk→extract→finalize)
@@ -85,7 +91,8 @@ unipress-de/
 │   │   ├── test_jobs.py
 │   │   ├── test_ingestion.py    #   Parser + chunker (in-memory generated PDF)
 │   │   ├── test_documents.py    #   Upload → ingest → chunks API flow
-│   │   └── test_claims.py       #   Guardrail + heuristic extractor + claims API
+│   │   ├── test_claims.py       #   Guardrail + heuristic extractor + claims API
+│   │   └── test_retrieval.py    #   Embedder + vector store + search endpoint
 │   ├── pyproject.toml           # Python deps + tool config (ruff/mypy/pytest)
 │   ├── uv.lock                  # Pinned, reproducible dependency lockfile
 │   ├── Dockerfile               # Builds the shared api/worker image
@@ -214,7 +221,7 @@ are swappable. This is the key architectural pattern.
 
 | Port ([`ports/base.py`](api/app/ports/base.py)) | Purpose | Phase-0 adapter ([`adapters/stubs.py`](api/app/adapters/stubs.py)) | Graduation target |
 |---|---|---|---|
-| `VectorStore` | Embedding index | `InMemoryVectorStore` (substring match) | Chroma → Qdrant (Phase 1c) |
+| `VectorStore` | Embedding index (add/query/delete over vectors + metadata) | `ChromaVectorStore` (real) + `InMemoryVectorStore` (tests) in [`retrieval/`](api/app/retrieval/) | Chroma → Qdrant |
 | `LLMGateway` | Text generation | `EchoLLM` stub **and** `LiteLLMGateway` ([`llm/gateway.py`](api/app/llm/gateway.py), real, opt-in) | LiteLLM (OpenAI/Ollama) — done |
 | `Storage` | Blob storage | `LocalStorage` (local FS, now storing uploaded PDFs + parse artifacts) | MinIO / S3 |
 | `TaskDispatch` | Async job dispatch | `CeleryTaskDispatch` (`enqueue_pipeline`, `enqueue_ingestion`) | (Celery kept) |
@@ -234,6 +241,7 @@ satisfies a port — [`tests/test_jobs.py`](api/tests/test_jobs.py) asserts exac
 | `GET /documents/{id}` | `documents.py` | Ingestion status: page/chunk counts, warnings, errors (404 if missing). |
 | `GET /documents/{id}/chunks` | `documents.py` | Ordered chunks with spans (page/section/offsets/bbox) — the evidence-highlight source. |
 | `GET /documents/{id}/claims` | `documents.py` | Extracted claims: text, type, quote, span, numeric flag, importance. |
+| `POST /documents/{id}/search` | `documents.py` | Semantic search (RAG retrieval): embeds the query, queries the vector store, returns span-linked chunk hits with scores. |
 | `GET /` | [`main.py`](api/app/main.py) | Service metadata. |
 | `GET /metrics` | (Instrumentator) | Prometheus metrics, scraped by Prometheus. |
 | `GET /docs` | (FastAPI) | OpenAPI/Swagger UI. |
@@ -246,14 +254,14 @@ delegated to the worker.
 | File | Role |
 |---|---|
 | [`celery_app.py`](api/app/tasks/celery_app.py) | Defines the `celery` app. **Redis is both broker and result backend.** Configures JSON serialization, `task_acks_late`, `prefetch_multiplier=1`. Wires tracing so api→worker spans connect. |
-| [`chains.py`](api/app/tasks/chains.py) | Two Celery chains: (1) the **demo** `start_pipeline(job_id)` (still backs `POST /jobs`); (2) the **real ingestion** `start_ingestion(job_id, document_id)` = `parse → chunk → extract → finalize`, delegating to [`ingestion/service.py`](api/app/ingestion/service.py) and [`claims/service.py`](api/app/claims/service.py), with per-stage failure capture → `failed`. The `embed` stage joins here in Phase 1c. |
+| [`chains.py`](api/app/tasks/chains.py) | Two Celery chains: (1) the **demo** `start_pipeline(job_id)` (still backs `POST /jobs`); (2) the **real ingestion** `start_ingestion(job_id, document_id)` = `parse → chunk → extract → embed → finalize`, delegating to the `ingestion` / `claims` / `retrieval` services, with per-stage failure capture → `failed`. |
 
 **Queue mechanics (ingestion):** `POST /documents` stores the PDF →
 `CeleryTaskDispatch.enqueue_ingestion` → `start_ingestion` → `parse_stage`
 (writes `parsed.json` + page metadata) → `chunk_stage` (writes `Chunk` rows) →
-`extract_stage` (extracts + quote-verifies `Claim` rows) → `finalize`. Stages
-re-load from storage/DB by id, so no large payloads cross the broker and each
-stage is idempotent.
+`extract_stage` (quote-verifies `Claim` rows) → `embed_stage` (embeds chunks into
+the vector store) → `finalize`. Stages re-load from storage/DB by id, so no large
+payloads cross the broker and each stage is idempotent.
 
 ### 5.6 Database, migrations & schema
 
@@ -392,6 +400,9 @@ values are stored in the repo** — `.env` is gitignored.
 | `DATABASE_URL` | api/worker/migrate | Full SQLAlchemy connection string (assembled in Compose). |
 | `REDIS_URL` | api/worker | Celery broker + result backend. |
 | `STORAGE_ROOT` | api/worker | Filesystem root for uploaded PDFs + parse artifacts (`/data/storage` in Compose). |
+| `CHROMA_URL` | api/worker | Chroma HTTP endpoint (`http://chroma:8000` in Compose); empty → local persistent Chroma. |
+| `EMBED_MODEL` | api/worker | Embedding model (default `intfloat/multilingual-e5-small`; set `BAAI/bge-m3` on the VM). |
+| `HF_HOME` | api/worker | HuggingFace cache dir (`/data/hf-cache` volume) so model weights download once. |
 | `GRAFANA_ADMIN_PASSWORD` | grafana | Grafana admin password (**secret**). |
 | `OPENAI_API_KEY` | api/worker | LLM key (**secret**). Only used when `LLM_EXTRACTION=true`; empty by default. |
 | `LLM_EXTRACTION` | api/worker | Opt-in flag for the LLM claim extractor (default `false` → deterministic heuristic, no API calls/spend). |
@@ -412,7 +423,9 @@ values are stored in the repo** — `.env` is gitignored.
 | **Ollama** | Scaffolded (local-llm profile) | Optional local LLM. |
 | **OpenAI (via LiteLLM)** | Wired, opt-in | `LiteLLMGateway` + LLM claim extractor; only called when `LLM_EXTRACTION=true`. |
 | **PyMuPDF** | Active | PDF parsing (text + bbox). |
-| **Chroma, BGE-M3, DeBERTa, GROBID** | Planned | Named in `docs/07`; retrieval/NLI land in Phase 1c / Phase 2. |
+| **Chroma** | Active (core profile) | Vector store for chunk embeddings. |
+| **sentence-transformers (e5-small; BGE-M3 swappable)** | Active | Local embeddings for retrieval. |
+| **DeBERTa NLI, bge-reranker, GROBID** | Planned | NLI/rerank land in Phase 2 / later 1c. |
 
 ---
 
@@ -446,8 +459,8 @@ flowchart LR
 
 **Ingestion data flow (current, Phase 1a):**
 1. A client uploads a PDF (`POST /documents`). The API stores the bytes via the `Storage` port, writes a `pending` `Document` + `Job`, enqueues the ingestion chain, and returns immediately.
-2. The worker runs `parse` (PyMuPDF → text + bbox spans, persisted as `parsed.json`), `chunk` (structure-aware chunks with exact `SourceSpan` → `Chunk` rows), `extract` (atomic claims, each **quote-verified** → `Claim` rows), then `finalize`.
-3. The client reads `GET /documents/{id}` (status, page/chunk/claim counts, warnings), `/chunks` (spans for highlighting), and `/claims` (typed, quote-verified claims).
+2. The worker runs `parse` (PyMuPDF → text + bbox spans, persisted as `parsed.json`), `chunk` (structure-aware chunks with exact `SourceSpan` → `Chunk` rows), `extract` (atomic claims, each **quote-verified** → `Claim` rows), `embed` (chunk embeddings → Chroma), then `finalize`.
+3. The client reads `GET /documents/{id}` (status, page/chunk/claim counts, warnings), `/chunks`, `/claims`, and runs `POST /documents/{id}/search` for semantic retrieval over the embedded chunks.
 4. Throughout, api + worker emit traces (→ OTel → Tempo) and metrics (→ Prometheus → Grafana).
 
 > The demo `POST /jobs` path from Phase 0 still exists for the frontend shell;
@@ -467,7 +480,8 @@ flowchart LR
 | Observability wiring | **Implemented** (trace-in-Tempo confirmation still pending) |
 | **PDF ingestion: upload → parse (spans/bbox) → chunk** | **Implemented & verified** (Phase 1a) |
 | **Claim extraction (quote-verified `Claim` store; heuristic + opt-in LLM)** | **Implemented & verified** (Phase 1b) |
-| Embeddings → Chroma retrieval + reranker | **Not started** (Phase 1c) |
+| **Embeddings → Chroma retrieval + semantic search** | **Implemented & verified** (Phase 1c) |
+| Reranker (bge-reranker); eval gold set + MLflow A/B | **Not started** (rest of Phase 1) |
 | Generation + TrustLayer | **Not started** (Phase 2) |
 | Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
 

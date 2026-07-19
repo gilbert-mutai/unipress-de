@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
 from app.db_models import Chunk, Claim, Document, Job
-from app.models import ChunkRead, ClaimRead, DocumentRead
+from app.models import ChunkRead, ClaimRead, DocumentRead, SearchHit, SearchQuery
 from app.ports import Storage
 
 from .deps import get_storage
@@ -78,3 +78,28 @@ def get_claims(document_id: str, db: Session = Depends(get_db)) -> list[Claim]:
     return list(
         db.scalars(select(Claim).where(Claim.document_id == document_id).order_by(Claim.key))
     )
+
+
+@router.post("/{document_id}/search", response_model=list[SearchHit])
+def search_document(
+    document_id: str, payload: SearchQuery, db: Session = Depends(get_db)
+) -> list[SearchHit]:
+    """Semantic search over a document's embedded chunks (the RAG retrieval step)."""
+    if db.get(Document, document_id) is None:
+        raise HTTPException(status_code=404, detail="document not found")
+
+    from app.retrieval.service import search
+
+    hits = search(document_id, payload.query, payload.k)
+    return [
+        SearchHit(
+            chunk_id=h.id,
+            page=int(h.metadata.get("page", 0)),
+            section=h.metadata.get("section"),
+            char_start=h.metadata.get("char_start"),
+            char_end=h.metadata.get("char_end"),
+            score=round(1.0 - h.distance, 4),
+            text=h.text,
+        )
+        for h in hits
+    ]

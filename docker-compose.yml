@@ -10,6 +10,9 @@ x-app-env: &app-env
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-unipress}:${POSTGRES_PASSWORD:-unipress}@postgres:5432/${POSTGRES_DB:-unipress}
   REDIS_URL: redis://redis:6379/0
   STORAGE_ROOT: /data/storage
+  CHROMA_URL: http://chroma:8000
+  EMBED_MODEL: ${EMBED_MODEL:-intfloat/multilingual-e5-small}
+  HF_HOME: /data/hf-cache
   OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-unipress}
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 
@@ -42,6 +45,17 @@ services:
       timeout: 3s
       retries: 12
 
+  chroma:
+    image: chromadb/chroma:0.5.23
+    profiles: [core]
+    volumes:
+      - chromadata:/data
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   # One-shot: apply migrations before api/worker start.
   migrate:
     build: ./api
@@ -60,11 +74,14 @@ services:
     environment: *app-env
     volumes:
       - storage:/data/storage
+      - hfcache:/data/hf-cache
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      chroma:
+        condition: service_started
       migrate:
         condition: service_completed_successfully
     healthcheck:
@@ -83,9 +100,12 @@ services:
     environment: *app-env
     volumes:
       - storage:/data/storage
+      - hfcache:/data/hf-cache
     depends_on:
       redis:
         condition: service_healthy
+      chroma:
+        condition: service_started
       migrate:
         condition: service_completed_successfully
 
@@ -174,6 +194,8 @@ volumes:
   pgdata:
   redisdata:
   storage:
+  chromadata:
+  hfcache:
   tempodata:
   grafanadata:
   mlflowdata:

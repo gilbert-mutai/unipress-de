@@ -114,6 +114,20 @@ def task_extract(prev: object, job_id: str, document_id: str) -> str:
     return job_id
 
 
+@celery.task(name="ingest.embed")
+def task_embed(prev: object, job_id: str, document_id: str) -> str:
+    from app.retrieval.service import embed_stage
+
+    _set(job_id, stage="embed")
+    try:
+        n = embed_stage(document_id)
+    except Exception as exc:
+        _fail(job_id, document_id, exc)
+        raise
+    _set(job_id, result=f"embedded: {n} chunks")
+    return job_id
+
+
 @celery.task(name="ingest.finalize")
 def ingest_finalize(prev: object, job_id: str, document_id: str) -> str:
     _set(job_id, status="done", stage="done")
@@ -139,6 +153,7 @@ def start_ingestion(job_id: str, document_id: str) -> str:
         task_parse.si(job_id, document_id),
         task_chunk.s(job_id, document_id),
         task_extract.s(job_id, document_id),
+        task_embed.s(job_id, document_id),
         ingest_finalize.s(job_id, document_id),
     )
     return workflow.apply_async().id

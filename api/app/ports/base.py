@@ -2,16 +2,28 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
+
+from app.retrieval.types import VectorHit
 
 
 @runtime_checkable
 class VectorStore(Protocol):
-    """Embedding index. Graduation path: in-memory stub -> Chroma -> Qdrant."""
+    """Embedding index over precomputed vectors. Graduation: in-memory -> Chroma -> Qdrant."""
 
-    def upsert(self, doc_id: str, chunks: list[str]) -> int: ...
+    def add(
+        self,
+        ids: list[str],
+        embeddings: list[list[float]],
+        documents: list[str],
+        metadatas: list[dict[str, Any]],
+    ) -> int: ...
 
-    def query(self, text: str, k: int = 5) -> list[str]: ...
+    def query(
+        self, embedding: list[float], k: int = 5, where: dict[str, Any] | None = None
+    ) -> list[VectorHit]: ...
+
+    def delete(self, where: dict[str, Any]) -> None: ...
 
 
 @runtime_checkable

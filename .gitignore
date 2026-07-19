@@ -48,6 +48,7 @@ data/interim/
 data/processed/
 *.faiss
 chroma/
+var/chroma/
 qdrant_storage/
 mlruns/
 wandb/
