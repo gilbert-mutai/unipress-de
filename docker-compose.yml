@@ -9,6 +9,7 @@ x-app-env: &app-env
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-unipress}:${POSTGRES_PASSWORD:-unipress}@postgres:5432/${POSTGRES_DB:-unipress}
   REDIS_URL: redis://redis:6379/0
+  STORAGE_ROOT: /data/storage
   OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-unipress}
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 
@@ -57,6 +58,8 @@ services:
     profiles: [core]
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment: *app-env
+    volumes:
+      - storage:/data/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,6 +81,8 @@ services:
     profiles: [core]
     command: ["celery", "-A", "app.tasks.celery_app.celery", "worker", "--loglevel=INFO", "--concurrency=2"]
     environment: *app-env
+    volumes:
+      - storage:/data/storage
     depends_on:
       redis:
         condition: service_healthy
@@ -168,6 +173,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  storage:
   tempodata:
   grafanadata:
   mlflowdata:

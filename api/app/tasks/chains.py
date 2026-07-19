@@ -53,7 +53,7 @@ def finalize(prev: object, job_id: str) -> str:
 
 
 def start_pipeline(job_id: str) -> str:
-    """Build and enqueue the stage chain. Returns the Celery result id."""
+    """Build and enqueue the demo stage chain (no document). Returns the result id."""
     # First stage is immutable (.si) so nothing is passed into it; the rest
     # receive the previous stage's return as their `prev` arg.
     steps = [run_stage.si(None, job_id, STAGES[0])]
@@ -61,3 +61,69 @@ def start_pipeline(job_id: str) -> str:
     steps.append(finalize.s(job_id))
     async_result = chain(*steps).apply_async()
     return async_result.id
+
+
+# --- Real ingestion pipeline (Phase 1): parse a PDF into a span-linked claim store.
+# Stages will grow (extract, embed) in Phase 1b/1c; for now: ingest -> parse -> chunk.
+
+
+def _fail(job_id: str, document_id: str, exc: Exception) -> None:
+    _set(job_id, status="failed", error=str(exc))
+    _set_document(document_id, status="failed", error=str(exc))
+
+
+@celery.task(name="ingest.parse")
+def task_parse(job_id: str, document_id: str) -> str:
+    from app.ingestion.service import parse_stage
+
+    _set(job_id, status="processing", stage="parse")
+    _set_document(document_id, status="processing")
+    try:
+        parse_stage(document_id)
+    except Exception as exc:
+        _fail(job_id, document_id, exc)
+        raise
+    return job_id
+
+
+@celery.task(name="ingest.chunk")
+def task_chunk(prev: object, job_id: str, document_id: str) -> str:
+    from app.ingestion.service import chunk_stage
+
+    _set(job_id, stage="chunk")
+    try:
+        n = chunk_stage(document_id)
+    except Exception as exc:
+        _fail(job_id, document_id, exc)
+        raise
+    _set(job_id, result=f"ingested: {n} chunks")
+    return job_id
+
+
+@celery.task(name="ingest.finalize")
+def ingest_finalize(prev: object, job_id: str, document_id: str) -> str:
+    _set(job_id, status="done", stage="done")
+    _set_document(document_id, status="done")
+    log.info("ingest.done", job_id=job_id, document_id=document_id)
+    return job_id
+
+
+def _set_document(document_id: str, **fields: object) -> None:
+    from app.db_models import Document
+
+    with session_scope() as s:
+        doc = s.get(Document, document_id)
+        if doc is None:
+            raise ValueError(f"document {document_id} not found")
+        for key, value in fields.items():
+            setattr(doc, key, value)
+
+
+def start_ingestion(job_id: str, document_id: str) -> str:
+    """Enqueue the real PDF ingestion chain. Returns the Celery result id."""
+    workflow = chain(
+        task_parse.si(job_id, document_id),
+        task_chunk.s(job_id, document_id),
+        ingest_finalize.s(job_id, document_id),
+    )
+    return workflow.apply_async().id

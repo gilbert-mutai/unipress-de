@@ -31,8 +31,10 @@ class EchoLLM:
 
 
 class LocalStorage:
-    def __init__(self, root: str = "/tmp/unipress-storage") -> None:
-        self.root = Path(root)
+    def __init__(self, root: str | None = None) -> None:
+        from app.core.settings import get_settings
+
+        self.root = Path(root or get_settings().storage_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
     def put(self, key: str, data: bytes) -> str:
@@ -46,9 +48,14 @@ class LocalStorage:
 
 
 class CeleryTaskDispatch:
-    """Adapter over the Celery pipeline entrypoint (imported lazily to avoid cycles)."""
+    """Adapter over the Celery pipeline entrypoints (imported lazily to avoid cycles)."""
 
     def enqueue_pipeline(self, job_id: str) -> str:
         from app.tasks.chains import start_pipeline
 
         return start_pipeline(job_id)
+
+    def enqueue_ingestion(self, job_id: str, document_id: str) -> str:
+        from app.tasks.chains import start_ingestion
+
+        return start_ingestion(job_id, document_id)

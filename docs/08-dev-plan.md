@@ -25,7 +25,7 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 | # | Phase | Weeks | Dates (2026) | Focus | Cumulative days |
 |---|---|---|---|---|---|
 | **P0** ✅ | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 |
-| **P1** | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG | 15 |
+| **P1** 🚧 | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG · *1a ingestion done* | 15 |
 | **P2** | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
 | **P3** | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
 | **P4** | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
@@ -106,6 +106,11 @@ gantt
 - Retrieval returns relevant chunks for probe queries in **both HU and EN**; retrieval A/B (BGE-M3 vs `text-embedding-3-large`) logged to MLflow to confirm the default.
 
 **Risks:** multi-column / table extraction quality on the papers → GROBID is the pre-scoped fallback (`07` §2.1), introduced only against a measured need. HU tokenization/accents → verified explicitly on the curriculum in DoD.
+
+**Status — 🚧 in progress. Sub-phase 1a (ingestion → parsing → chunking) ✅ delivered (19 Jul 2026).**
+- **Built:** PyMuPDF parser (text + bbox blocks, image-only detection → warning); structure-aware chunker (page-bounded chunks, best-effort section detection, exact `SourceSpan` provenance); `Document`/`Chunk` tables + Alembic `0002`; `Storage` port wired for uploads (shared api/worker volume); `POST /documents` upload + `GET /documents/{id}` + `/chunks`; real Celery chain `parse → chunk → finalize`; ingestion contracts (`SourceSpan`, `ParsedDoc`, `Chunk`).
+- **Verified:** all 6 sample PDFs parse cleanly (page counts match the manifest; HU accents preserved; **0 chunk-provenance failures** — every chunk's quote is an exact substring at its recorded offsets). End-to-end via the running stack: EN paper → 10 pages/94 chunks, HU curriculum → 9 pages/19 chunks, each chunk carrying page + char offsets + bbox. 14 pytest, ruff + mypy clean.
+- **Remaining in P1:** **1b** claim extraction (schema-constrained LLM + quote-verification guardrail → `Claim` store), **1c** BGE-M3 embeddings → Chroma adapter (behind `VectorStore`) + reranker + `extract`/`embed` stages, and the front-loaded gold + adversarial eval set (1 EN + 1 HU). Retrieval A/B → MLflow lands with 1c.
 
 ---
 
