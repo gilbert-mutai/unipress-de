@@ -47,9 +47,19 @@ class Settings(BaseSettings):
     # opt-in (requires BOTH the flag and a key) so no spend happens by accident.
     openai_api_key: str = Field(default="")
     llm_extraction: bool = Field(default=False)
+    llm_generation: bool = Field(default=False)
     llm_extract_model: str = Field(default="gpt-4o-mini")
     llm_judge_model: str = Field(default="gpt-4o-mini")
     llm_generation_model: str = Field(default="gpt-4o")
+
+    # TrustLayer. nli_backend: "lexical" (proxy, default) | "nli" (DeBERTa, Phase 2b).
+    nli_backend: str = Field(default="lexical")
+    trust_w1: float = Field(default=0.4)  # entailment weight
+    trust_w2: float = Field(default=0.4)  # judge supported-fraction weight
+    trust_w3: float = Field(default=0.2)  # quote overlap weight
+    trust_numeric_penalty: float = Field(default=0.6)
+    trust_export_threshold: float = Field(default=0.7)
+    trust_low_threshold: float = Field(default=0.45)
 
     @property
     def otel_enabled(self) -> bool:

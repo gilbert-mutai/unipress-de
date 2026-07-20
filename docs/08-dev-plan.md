@@ -26,7 +26,7 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 |---|---|---|---|---|---|
 | **P0** ✅ | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 |
 | **P1** 🚧 | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG · *1a ingestion done* | 15 |
-| **P2** | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
+| **P2** 🚧 | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring · *2a gen+trust-core done* | 25 |
 | **P3** | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
 | **P4** | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
 | **P5** | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board | 47 |
@@ -135,6 +135,11 @@ gantt
 - Thresholds/weights tuned against the frozen gold set; the tuning run is versioned in MLflow.
 
 **Risks:** local ML memory footprint (BGE-M3 + DeBERTa + reranker ≈ 5–6 GB) → models loaded **once in the worker** per `07` §7; validate the memory budget on the target VM spec early. Judge cost/latency → T1 gates most sentences off the paid judge; Redis memoization on repeated claims.
+
+**Status — 🚧 in progress. Sub-phase 2a (claim-bound generation + deterministic TrustLayer core) ✅ delivered (20 Jul 2026).**
+- **Built:** generation contracts (`OutputType`, `SentenceRole`, `Verdict`, `GeneratedSentence`/`Output`, `OutputSpec`); per-type specs (press release + exec summary, docs/04); **claim-bound generator** — deterministic fallback (renders verified claims, every factual sentence cites its claim key; no key needed) **+ opt-in LiteLLM path** (`llm_generation` flag + key, schema-constrained, one self-repair pass); **TrustLayer deterministic core** — numeric-mismatch check (2% rounding tolerance), quote-overlap, lexical-entailment proxy, confidence blend + hard numeric penalty (docs/03 §5.4), per-sentence verdict (SUPPORTED/INTERPRETATION/RHETORICAL/UNSUPPORTED/CONTRADICTED) with export threshold — all behind `Entailment` port; `outputs`/`output_sentences` tables + Alembic `0004`; generation Celery task; `POST /documents/{id}/outputs`, `GET /documents/{id}/outputs`, `GET /documents/outputs/{id}`.
+- **Verified:** 25 pytest (ruff+mypy clean). TrustLayer unit tests prove the headline DoD deterministically — **`88.8% → 98.8%` numeric perturbation → CONTRADICTED**; a claim-less factual sentence → UNSUPPORTED; framing → RHETORICAL. End-to-end via TestClient (real DB): upload → extract → generate press release → every factual sentence carries a claim citation + verdict + confidence.
+- **Remaining in P2 (2b):** real **NLI** (DeBERTa/mDeBERTa) behind the `Entailment` port (replaces the lexical proxy) + **LLM judge** (Tier-2, `gpt-4o-mini`) for borderline/numeric sentences + the judge-supported term in the confidence blend; document-level coverage/consistency checks (docs/03 §5.5). Thresholds/weights tuning → MLflow lands with the eval harness.
 
 ---
 

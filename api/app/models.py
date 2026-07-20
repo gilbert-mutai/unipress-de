@@ -95,3 +95,37 @@ class SearchHit(BaseModel):
     char_end: int | None = None
     score: float  # 1 - distance (higher = more relevant)
     text: str
+
+
+class GenerateRequest(BaseModel):
+    output_type: str = Field(default="PRESS_RELEASE")
+    language: str = Field(default="en", pattern="^(en|hu)$")
+
+
+class SentenceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    order_index: int
+    text: str
+    role: str
+    claim_ids: list[str] | None = None
+    section: str | None = None
+    verdict: str | None = None
+    confidence: float | None = None
+    rationale: str | None = None
+
+
+class OutputSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    output_type: str
+    language: str
+    title: str
+    status: JobStatus
+    created_at: datetime
+
+
+class OutputDetail(OutputSummary):
+    sentences: list[SentenceRead] = []

@@ -46,3 +46,10 @@ class CeleryTaskDispatch:
         from app.tasks.chains import start_ingestion
 
         return start_ingestion(job_id, document_id)
+
+    def enqueue_generation(
+        self, job_id: str, document_id: str, output_type: str, language: str
+    ) -> str:
+        from app.tasks.chains import start_generation
+
+        return start_generation(job_id, document_id, output_type, language)

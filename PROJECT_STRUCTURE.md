@@ -1,12 +1,13 @@
 # UniPress DE — Project Structure
 
 > Documentation of the repository layout, components, and data flow.
-> **Reflects the codebase as of Phase 1c.** The full production stack runs
-> end-to-end (Phase 0); real **PDF ingestion → chunking** (1a), **quote-verified
-> claim extraction** (1b), and **embeddings → Chroma retrieval + semantic search**
-> (1c) are implemented and verified. Generation and the TrustLayer are still ahead —
-> see the [Status & maturity](#status--maturity) section. Everything below is
-> based on the actual committed files, not planned features.
+> **Reflects the codebase as of Phase 2a.** The full production stack runs
+> end-to-end (Phase 0); **PDF ingestion → chunking** (1a), **quote-verified claim
+> extraction** (1b), **embeddings → Chroma retrieval** (1c), and **claim-bound
+> generation + the deterministic TrustLayer core** (2a) are implemented and
+> verified. The real NLI model + LLM judge (2b) are still ahead — see the
+> [Status & maturity](#status--maturity) section. Everything below is based on the
+> actual committed files, not planned features.
 >
 > 🔄 **This is a living document — keep it current.** Whenever a change adds or
 > removes a service, entry point, route, model, migration, env var, dependency,
@@ -68,6 +69,17 @@ unipress-de/
 │   │   │   ├── memory_store.py  #   InMemoryVectorStore (tests/local)
 │   │   │   ├── chroma_store.py  #   ChromaVectorStore (production)
 │   │   │   └── service.py       #   embed_stage + search + store/embedder factories
+│   │   ├── generation/          # Claim-bound generation (docs/04)
+│   │   │   ├── models.py        #   OutputType, SentenceRole, Verdict, GeneratedOutput, OutputSpec
+│   │   │   ├── specs.py         #   Per-type specs (press release, exec summary)
+│   │   │   ├── fallback.py      #   Deterministic generator (no key; default)
+│   │   │   ├── llm_generator.py #   Schema-constrained LLM generator (opt-in)
+│   │   │   └── service.py       #   generate → verify → persist
+│   │   ├── trustlayer/          # Verify each sentence vs its cited source (docs/03 §5)
+│   │   │   ├── numeric.py       #   Numeric-mismatch check (hard fail)
+│   │   │   ├── entailment.py    #   Entailment port + lexical proxy (NLI in 2b)
+│   │   │   ├── scorer.py        #   Confidence blend + numeric penalty
+│   │   │   └── verify.py        #   Per-sentence verdict + confidence
 │   │   ├── llm/                 # LLM access
 │   │   │   └── gateway.py       #   LiteLLMGateway (LLMGateway port; retry/timeout)
 │   │   ├── ports/               # Hexagonal interfaces (Protocols)
@@ -76,14 +88,15 @@ unipress-de/
 │   │   │   └── stubs.py         #   EchoLLM / LocalStorage / CeleryTaskDispatch stubs
 │   │   └── tasks/               # Async processing
 │   │       ├── celery_app.py    #   ★ Celery worker entry point
-│   │       └── chains.py        #   Demo chain + ingestion chain (parse→chunk→extract→finalize)
+│   │       └── chains.py        #   Demo + ingestion (parse→chunk→extract→embed) + generation chains
 │   ├── alembic/                 # Database migrations
 │   │   ├── env.py
 │   │   ├── script.py.mako
 │   │   └── versions/
 │   │       ├── 0001_initial.py  #   Creates the `jobs` table
 │   │       ├── 0002_documents_chunks.py  # documents + chunks tables; jobs.document_id
-│   │       └── 0003_claims.py   #   claims table; documents.claim_count
+│   │       ├── 0003_claims.py   #   claims table; documents.claim_count
+│   │       └── 0004_outputs.py  #   outputs + output_sentences tables
 │   ├── alembic.ini
 │   ├── tests/                   # pytest suite (SQLite-backed, no infra needed)
 │   │   ├── conftest.py
@@ -92,7 +105,9 @@ unipress-de/
 │   │   ├── test_ingestion.py    #   Parser + chunker (in-memory generated PDF)
 │   │   ├── test_documents.py    #   Upload → ingest → chunks API flow
 │   │   ├── test_claims.py       #   Guardrail + heuristic extractor + claims API
-│   │   └── test_retrieval.py    #   Embedder + vector store + search endpoint
+│   │   ├── test_retrieval.py    #   Embedder + vector store + search endpoint
+│   │   ├── test_generation.py   #   Claim-bound generation API + verdicts
+│   │   └── test_trustlayer.py   #   Numeric-mismatch + verdict assignment
 │   ├── pyproject.toml           # Python deps + tool config (ruff/mypy/pytest)
 │   ├── uv.lock                  # Pinned, reproducible dependency lockfile
 │   ├── Dockerfile               # Builds the shared api/worker image
@@ -205,14 +220,11 @@ ML-heavy image once embeddings/NLI land.
 
 | File | Type | Contents |
 |---|---|---|
-| [`db_models.py`](api/app/db_models.py) | SQLAlchemy ORM | `Job` (run-state; `document_id`), `Document` (PDF + ingestion status/counts/warnings), `Chunk` (span-linked text unit), `Claim` (quote-verified atomic claim: text/type/flattened span/entities/importance/numeric). |
-| [`models.py`](api/app/models.py) | Pydantic | API contracts: `JobStatus`, `JobCreate`/`JobRead`, `DocumentRead`, `ChunkRead`, `ClaimRead`. |
+| [`db_models.py`](api/app/db_models.py) | SQLAlchemy ORM | `Job`, `Document`, `Chunk`, `Claim`, plus `OutputRecord` (a generated output) and `SentenceRecord` (a generated sentence with role/claim_ids/verdict/confidence/rationale). |
+| [`models.py`](api/app/models.py) | Pydantic | API contracts: `JobRead`, `DocumentRead`, `ChunkRead`, `ClaimRead`, `SearchHit`, `GenerateRequest`, `OutputSummary`/`OutputDetail`, `SentenceRead`. |
 | [`ingestion/models.py`](api/app/ingestion/models.py) | Pydantic | `SourceSpan` (docs/03 §1.1), `Block`, `Page`, `ParsedDoc`, `Chunk`. |
 | [`claims/models.py`](api/app/claims/models.py) | Pydantic | `ClaimType` (docs/03 §2.2), `Claim` (docs/03 §1.2). |
-
-> Note: `GeneratedSentence` / `Output` (docs/03 §1.3–1.4) are **not yet
-> implemented** — they arrive with generation (Phase 2). `SourceSpan`, `Chunk`,
-> and `Claim` now exist.
+| [`generation/models.py`](api/app/generation/models.py) | Pydantic | `OutputType`, `SentenceRole`, `Verdict`, `GeneratedSentence`/`GeneratedOutput` (docs/03 §1.3–1.4), `OutputSpec`. |
 
 ### 5.3 Ports & adapters (hexagonal architecture)
 
@@ -242,6 +254,9 @@ satisfies a port — [`tests/test_jobs.py`](api/tests/test_jobs.py) asserts exac
 | `GET /documents/{id}/chunks` | `documents.py` | Ordered chunks with spans (page/section/offsets/bbox) — the evidence-highlight source. |
 | `GET /documents/{id}/claims` | `documents.py` | Extracted claims: text, type, quote, span, numeric flag, importance. |
 | `POST /documents/{id}/search` | `documents.py` | Semantic search (RAG retrieval): embeds the query, queries the vector store, returns span-linked chunk hits with scores. |
+| `POST /documents/{id}/outputs` | `documents.py` | Enqueue claim-bound generation of one output type/language (202; poll job, `result` = output id). |
+| `GET /documents/{id}/outputs` | `documents.py` | List generated outputs for a document. |
+| `GET /documents/outputs/{id}` | `documents.py` | Full output: each sentence with role, cited claim ids, **verdict + confidence** (the evidence-review payload). |
 | `GET /` | [`main.py`](api/app/main.py) | Service metadata. |
 | `GET /metrics` | (Instrumentator) | Prometheus metrics, scraped by Prometheus. |
 | `GET /docs` | (FastAPI) | OpenAPI/Swagger UI. |
@@ -270,6 +285,7 @@ payloads cross the broker and each stage is idempotent.
 - **`0001_initial`** ([versions/0001_initial.py](api/alembic/versions/0001_initial.py)) — `jobs` table + `ix_jobs_status`.
 - **`0002_documents_chunks`** ([versions/0002_documents_chunks.py](api/alembic/versions/0002_documents_chunks.py)) — `documents` + `chunks` tables (FK `chunks.document_id → documents.id`, cascade) and `jobs.document_id`.
 - **`0003_claims`** ([versions/0003_claims.py](api/alembic/versions/0003_claims.py)) — `claims` table (FK to `documents`, cascade) and `documents.claim_count`.
+- **`0004_outputs`** ([versions/0004_outputs.py](api/alembic/versions/0004_outputs.py)) — `outputs` + `output_sentences` tables (cascade), holding generated outputs and per-sentence verdicts.
 - Migrations run via a **one-shot `migrate` service** in Compose that must complete successfully before `api`/`worker` start (`service_completed_successfully`).
 
 ### 5.7 Tests (`api/tests/`)
@@ -482,7 +498,8 @@ flowchart LR
 | **Claim extraction (quote-verified `Claim` store; heuristic + opt-in LLM)** | **Implemented & verified** (Phase 1b) |
 | **Embeddings → Chroma retrieval + semantic search** | **Implemented & verified** (Phase 1c) |
 | Reranker (bge-reranker); eval gold set + MLflow A/B | **Not started** (rest of Phase 1) |
-| Generation + TrustLayer | **Not started** (Phase 2) |
+| **Claim-bound generation + TrustLayer core (numeric/overlap/verdict)** | **Implemented & verified** (Phase 2a) |
+| Real NLI model + LLM judge; coverage/consistency checks | **Not started** (Phase 2b) |
 | Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
 
 No files in the committed tree appear **dead or deprecated** — everything present
