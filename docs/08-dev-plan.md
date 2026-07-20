@@ -28,7 +28,7 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 | **P1** 🚧 | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG · *1a ingestion done* | 15 |
 | **P2** ✅ | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
 | **P3** ✅ | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
-| **P4** | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
+| **P4** ✅ | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
 | **P5** | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board | 47 |
 | **P6** | Deploy, harden & demo | W9–W10 | Sep 14 – Sep 25 | Angani VM, TLS, rehearse, **freeze** | 52 |
 
@@ -187,6 +187,11 @@ gantt
 - Flagged/blocked claims and confidence scores are legible to a non-technical reviewer.
 
 **Risks:** frontend is the largest single chunk of UI work for a backend-leaning solo builder → keep it purposeful (review UX only, no auth/settings sprawl — auth is a production graduation, `02` §8); reuse the highlight primitive across all output types.
+
+**Status — ✅ delivered (20 Jul 2026).**
+- **Built:** the Next.js review dashboard (`frontend/`). Typed API client (`app/lib/api.ts`) over the real endpoints. Three-step flow in `app/page.tsx`: **1) upload** a PDF → **poll ingestion** status (parsing→chunking→claims→embeddings) with page/chunk/claim counts; **2) generate** — pick output type (all 5) + language (EN/HU); poll the generation job → load the output; **3) review** — `EvidenceReview` component: left = generated sentences with **verdict badges + confidence + claim citations** (blocked UNSUPPORTED/CONTRADICTED ring-flagged), right = **source evidence** side-by-side (click a sentence → its cited claims' quotes with page/section), plus **accept/flag** per sentence, a **coverage-warning banner**, and **export** links (HTML / PDF via the render endpoint).
+- **Verified:** `tsc --noEmit` clean + `pnpm build` succeeds; client types mirror the backend read models; all endpoints it calls are covered by the backend test suite.
+- **Deviations/gaps (recorded):** single-page stateful flow with vanilla fetch + polling instead of React Query/Zod (lower-risk given no browser-test env here); **accept/edit/flag is client-side only** (no persistence endpoint yet — a small backend addition later); **live browser walkthrough pending** a running stack (blocked by the local Docker credential-helper issue — see risks). Frontend still uses direct api origin in dev (single-origin via nginx is Phase 6).
 
 ---
 

@@ -1,13 +1,15 @@
 # UniPress DE — Project Structure
 
 > Documentation of the repository layout, components, and data flow.
-> **Reflects the codebase as of Phase 3 (complete).** The full production stack
-> runs end-to-end (Phase 0); **ingestion → chunking** (1a), **quote-verified claim
+> **Reflects the codebase as of Phase 4.** The full production stack runs
+> end-to-end (Phase 0); **ingestion → chunking** (1a), **quote-verified claim
 > extraction** (1b), **embeddings → Chroma retrieval** (1c), **claim-bound
 > generation + the full TrustLayer** (2), and **5 output types + HTML/PDF rendering
-> with evidence trail + attribution** (3) are implemented and verified. The review
-> dashboard (Phase 4) is next — see [Status & maturity](#status--maturity).
-> Everything below is based on the actual committed files, not planned features.
+> with evidence trail + attribution** (3) are implemented and verified; the
+> **Next.js review dashboard** (4) is built and type-checks (live browser
+> walkthrough pending a running stack). Phase 5 (eval + observability) is next —
+> see [Status & maturity](#status--maturity). Everything below is based on the
+> actual committed files, not planned features.
 >
 > 🔄 **This is a living document — keep it current.** Whenever a change adds or
 > removes a service, entry point, route, model, migration, env var, dependency,
@@ -128,7 +130,9 @@ unipress-de/
 ├── frontend/                    # Next.js 14 (App Router) + TypeScript + Tailwind
 │   ├── app/
 │   │   ├── layout.tsx           #   Root layout + metadata
-│   │   ├── page.tsx             #   ★ UI: submit a job, poll stage progress
+│   │   ├── page.tsx             #   ★ Review dashboard: upload → progress → generate → review
+│   │   ├── lib/api.ts           #   Typed API client (documents/claims/outputs/render)
+│   │   ├── components/EvidenceReview.tsx  # Sentence↔source highlight, badges, accept/flag, export
 │   │   └── globals.css          #   Tailwind entry + base styles
 │   ├── package.json
 │   ├── pnpm-lock.yaml
@@ -322,11 +326,16 @@ A Next.js 14 App Router application (TypeScript + Tailwind).
 
 | File | Role |
 |---|---|
-| [`app/page.tsx`](frontend/app/page.tsx) | Client component. Calls `POST /jobs`, then **polls** `GET /jobs/{id}` every ~700 ms, rendering a stage checklist (`queued → ingest → parse → embed → verify → done`) until a terminal state. This is the Phase-0 stand-in for the evidence-review dashboard. |
+| [`app/page.tsx`](frontend/app/page.tsx) | The review dashboard: 3-step flow — **upload** a PDF → poll ingestion status → **generate** an output (type + language) by polling the generation job → **review**. |
+| [`app/components/EvidenceReview.tsx`](frontend/app/components/EvidenceReview.tsx) | Side-by-side review: sentences with verdict/confidence badges + citations (left) ↔ cited source claims with quote/page/section (right); accept/flag per sentence; coverage banner; HTML/PDF export links. |
+| [`app/lib/api.ts`](frontend/app/lib/api.ts) | Typed API client + response types mirroring the backend read models. |
 | [`app/layout.tsx`](frontend/app/layout.tsx) | Root HTML layout + page metadata. |
 | [`app/globals.css`](frontend/app/globals.css) | Tailwind directives + base body styles. |
 | [`next.config.mjs`](frontend/next.config.mjs) | `output: "standalone"` for a small runtime image. |
 | [`Dockerfile`](frontend/Dockerfile) | Multi-stage: deps → build → minimal `node` runtime serving `server.js`. |
+
+> Data layer is vanilla `fetch` + polling (not React Query/Zod, a documented
+> deviation); accept/edit/flag is client-side only (no persistence endpoint yet).
 
 **API base URL:** the browser reads `NEXT_PUBLIC_API_BASE` (defaults to
 `http://localhost:8000`). In production the frontend and API share one origin
@@ -515,7 +524,7 @@ flowchart LR
 | Reranker (bge-reranker); eval gold set + MLflow A/B | **Not started** (rest of Phase 1) |
 | **Claim-bound generation + TrustLayer (numeric, NLI, judge, coverage)** | **Implemented & verified** (Phase 2a+2b) |
 | **5 output types + HTML/PDF rendering (evidence trail + attribution)** | **Implemented & verified** (Phase 3) |
-| Review dashboard (upload → review-with-highlights → export) | **Not started** (Phase 4) |
+| **Review dashboard (upload → generate → review-with-highlights → export)** | **Built; builds+type-checks** (Phase 4; live browser walkthrough pending stack) |
 | Pairwise-NLI consistency check; thresholds tuning → MLflow | **Deferred** (Phase 5 harness) |
 | Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
 

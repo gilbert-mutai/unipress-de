@@ -3729,7 +3729,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.14" },
     { name = "celery", specifier = ">=5.4" },
-    { name = "chromadb", specifier = ">=0.5" },
+    { name = "chromadb", specifier = "==1.5.9" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "flower", specifier = ">=2.0" },
     { name = "gunicorn", specifier = ">=23" },

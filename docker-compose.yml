@@ -47,7 +47,7 @@ services:
       retries: 12
 
   chroma:
-    image: chromadb/chroma:0.5.23
+    image: chromadb/chroma:1.5.9  # must match the chromadb client version (api/pyproject.toml)
     profiles: [core]
     volumes:
       - chromadata:/data
