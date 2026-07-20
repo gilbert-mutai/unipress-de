@@ -1,12 +1,12 @@
 # UniPress DE — Project Structure
 
 > Documentation of the repository layout, components, and data flow.
-> **Reflects the codebase as of Phase 2 (complete).** The full production stack
-> runs end-to-end (Phase 0); **PDF ingestion → chunking** (1a), **quote-verified
-> claim extraction** (1b), **embeddings → Chroma retrieval** (1c), and
-> **claim-bound generation + the full TrustLayer** (2a numeric/overlap core +
-> 2b NLI, LLM judge, coverage) are implemented and verified. Phase 3 (bilingual
-> outputs + rendering) is next — see [Status & maturity](#status--maturity).
+> **Reflects the codebase as of Phase 3 (complete).** The full production stack
+> runs end-to-end (Phase 0); **ingestion → chunking** (1a), **quote-verified claim
+> extraction** (1b), **embeddings → Chroma retrieval** (1c), **claim-bound
+> generation + the full TrustLayer** (2), and **5 output types + HTML/PDF rendering
+> with evidence trail + attribution** (3) are implemented and verified. The review
+> dashboard (Phase 4) is next — see [Status & maturity](#status--maturity).
 > Everything below is based on the actual committed files, not planned features.
 >
 > 🔄 **This is a living document — keep it current.** Whenever a change adds or
@@ -83,6 +83,10 @@ unipress-de/
 │   │   │   ├── scorer.py        #   Confidence blend + numeric penalty
 │   │   │   ├── coverage.py      #   Document-level coverage (dropped-caveat warnings)
 │   │   │   └── verify.py        #   T1 gating → T2 judge → verdict + confidence
+│   │   ├── outputs/             # Render outputs to HTML/PDF (docs/04)
+│   │   │   ├── manifest.py      #   Attribution lookup from data/manifest.yaml
+│   │   │   ├── render.py        #   Jinja2 HTML + WeasyPrint PDF (lazy)
+│   │   │   └── templates/output.html  # Evidence trail + verdict badges + footer
 │   │   ├── llm/                 # LLM access
 │   │   │   └── gateway.py       #   LiteLLMGateway (LLMGateway port; retry/timeout)
 │   │   ├── ports/               # Hexagonal interfaces (Protocols)
@@ -111,7 +115,8 @@ unipress-de/
 │   │   ├── test_claims.py       #   Guardrail + heuristic extractor + claims API
 │   │   ├── test_retrieval.py    #   Embedder + vector store + search endpoint
 │   │   ├── test_generation.py   #   Claim-bound generation API + verdicts
-│   │   └── test_trustlayer.py   #   Numeric-mismatch + verdict assignment
+│   │   ├── test_trustlayer.py   #   Numeric-mismatch, NLI classify, judge, coverage
+│   │   └── test_outputs.py      #   HTML rendering: evidence trail + attribution
 │   ├── pyproject.toml           # Python deps + tool config (ruff/mypy/pytest)
 │   ├── uv.lock                  # Pinned, reproducible dependency lockfile
 │   ├── Dockerfile               # Builds the shared api/worker image
@@ -260,7 +265,8 @@ satisfies a port — [`tests/test_jobs.py`](api/tests/test_jobs.py) asserts exac
 | `POST /documents/{id}/search` | `documents.py` | Semantic search (RAG retrieval): embeds the query, queries the vector store, returns span-linked chunk hits with scores. |
 | `POST /documents/{id}/outputs` | `documents.py` | Enqueue claim-bound generation of one output type/language (202; poll job, `result` = output id). |
 | `GET /documents/{id}/outputs` | `documents.py` | List generated outputs for a document. |
-| `GET /documents/outputs/{id}` | `documents.py` | Full output: each sentence with role, cited claim ids, **verdict + confidence** (the evidence-review payload). |
+| `GET /documents/outputs/{id}` | `documents.py` | Full output: each sentence with role, cited claim ids, **verdict + confidence** + `coverage` (the evidence-review payload). |
+| `GET /documents/outputs/{id}/render` | `documents.py` | Render the output as `html` (default) or `pdf` — evidence trail, verdict badges, coverage warnings, attribution footer. |
 | `GET /` | [`main.py`](api/app/main.py) | Service metadata. |
 | `GET /metrics` | (Instrumentator) | Prometheus metrics, scraped by Prometheus. |
 | `GET /docs` | (FastAPI) | OpenAPI/Swagger UI. |
@@ -424,6 +430,8 @@ values are stored in the repo** — `.env` is gitignored.
 | `CHROMA_URL` | api/worker | Chroma HTTP endpoint (`http://chroma:8000` in Compose); empty → local persistent Chroma. |
 | `EMBED_MODEL` | api/worker | Embedding model (default `intfloat/multilingual-e5-small`; set `BAAI/bge-m3` on the VM). |
 | `HF_HOME` | api/worker | HuggingFace cache dir (`/data/hf-cache` volume) so model weights download once. |
+| `MANIFEST_PATH` | api | Path to `data/manifest.yaml` for output attribution (mounted at `/data/manifest/` in Compose). |
+| `NLI_BACKEND` / `LLM_JUDGE` | api/worker | TrustLayer opt-ins: real NLI model (`nli`) and Tier-2 judge (default off). |
 | `GRAFANA_ADMIN_PASSWORD` | grafana | Grafana admin password (**secret**). |
 | `OPENAI_API_KEY` | api/worker | LLM key (**secret**). Only used when `LLM_EXTRACTION=true`; empty by default. |
 | `LLM_EXTRACTION` | api/worker | Opt-in flag for the LLM claim extractor (default `false` → deterministic heuristic, no API calls/spend). |
@@ -446,7 +454,9 @@ values are stored in the repo** — `.env` is gitignored.
 | **PyMuPDF** | Active | PDF parsing (text + bbox). |
 | **Chroma** | Active (core profile) | Vector store for chunk embeddings. |
 | **sentence-transformers (e5-small; BGE-M3 swappable)** | Active | Local embeddings for retrieval. |
-| **DeBERTa NLI, bge-reranker, GROBID** | Planned | NLI/rerank land in Phase 2 / later 1c. |
+| **mDeBERTa NLI (multilingual)** | Active, opt-in | Tier-1 entailment; `nli_backend=nli`. |
+| **Jinja2 + WeasyPrint** | Active | HTML rendering + PDF export (WeasyPrint needs container libs). |
+| **bge-reranker, GROBID** | Planned | Rerank / academic parsing, later. |
 
 ---
 
@@ -504,6 +514,8 @@ flowchart LR
 | **Embeddings → Chroma retrieval + semantic search** | **Implemented & verified** (Phase 1c) |
 | Reranker (bge-reranker); eval gold set + MLflow A/B | **Not started** (rest of Phase 1) |
 | **Claim-bound generation + TrustLayer (numeric, NLI, judge, coverage)** | **Implemented & verified** (Phase 2a+2b) |
+| **5 output types + HTML/PDF rendering (evidence trail + attribution)** | **Implemented & verified** (Phase 3) |
+| Review dashboard (upload → review-with-highlights → export) | **Not started** (Phase 4) |
 | Pairwise-NLI consistency check; thresholds tuning → MLflow | **Deferred** (Phase 5 harness) |
 | Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
 

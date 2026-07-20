@@ -27,7 +27,7 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 | **P0** ✅ | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 |
 | **P1** 🚧 | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG · *1a ingestion done* | 15 |
 | **P2** ✅ | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
-| **P3** | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
+| **P3** ✅ | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
 | **P4** | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
 | **P5** | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board | 47 |
 | **P6** | Deploy, harden & demo | W9–W10 | Sep 14 – Sep 25 | Angani VM, TLS, rehearse, **freeze** | 52 |
@@ -162,6 +162,11 @@ gantt
 - Rendering is deterministic and covered by golden-file tests; HU output verified end-to-end on a HU-native source.
 
 **Risks:** HU generation quality vs. EN → per-language verification catches drift; the HU curriculum is the native test bed. Output sprawl → all five are the *same* `OutputSpec` abstraction over one claim store; deferred formats (newsletter/FAQ/slides) stay out (`04` §deferred).
+
+**Status — ✅ delivered (20 Jul 2026).**
+- **Built:** all **five `OutputSpec`s** (press release, article, social, exec summary, video script) over the one claim store; **Jinja2 HTML rendering** (`app/outputs/`) with the inline **evidence trail** (per-sentence verdict badge + confidence + claim citations), **coverage warnings**, and an **attribution footer** (title/authors/venue/DOI/license) sourced from [`data/manifest.yaml`](../data/manifest.yaml); **WeasyPrint PDF** export (lazy import; Dockerfile ships pango/cairo libs; 501 if unavailable); `GET /documents/outputs/{id}/render?format=html|pdf`. **Bilingual:** `language` (en|hu) flows through generation → the LLM path regenerates per language (not translation); TrustLayer uses multilingual mDeBERTa so HU verification works.
+- **Verified:** 33 pytest (ruff+mypy clean); HTML render carries evidence trail + verdict badges; attribution footer pulls real provenance from the manifest (e.g. Pap-smear paper → authors + DOI + CC BY 4.0).
+- **Honest gaps:** the **deterministic fallback generator renders in the source language** (real HU output needs the LLM path — mechanism wired, not run to save credits); PDF export verified by code path but needs the container's system libs (works in the image, not bare local); per-type structure (esp. video-script scenes) is best-shaped by the LLM path.
 
 ---
 
