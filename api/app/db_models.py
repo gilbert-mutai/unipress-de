@@ -108,3 +108,41 @@ class Claim(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped[Document] = relationship(back_populates="claims")
+
+
+class OutputRecord(Base):
+    __tablename__ = "outputs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    document_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    output_type: Mapped[str] = mapped_column(String(20))
+    language: Mapped[str] = mapped_column(String(8))
+    title: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    sentences: Mapped[list[SentenceRecord]] = relationship(
+        back_populates="output", cascade="all, delete-orphan", order_by="SentenceRecord.order_index"
+    )
+
+
+class SentenceRecord(Base):
+    __tablename__ = "output_sentences"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    output_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("outputs.id", ondelete="CASCADE"), index=True
+    )
+    order_index: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(String(20))
+    claim_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    section: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    verdict: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(nullable=True)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    output: Mapped[OutputRecord] = relationship(back_populates="sentences")

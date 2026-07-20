@@ -8,8 +8,18 @@ from sqlalchemy.orm import Session
 
 from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
-from app.db_models import Chunk, Claim, Document, Job
-from app.models import ChunkRead, ClaimRead, DocumentRead, SearchHit, SearchQuery
+from app.db_models import Chunk, Claim, Document, Job, OutputRecord
+from app.models import (
+    ChunkRead,
+    ClaimRead,
+    DocumentRead,
+    GenerateRequest,
+    JobRead,
+    OutputDetail,
+    OutputSummary,
+    SearchHit,
+    SearchQuery,
+)
 from app.ports import Storage
 
 from .deps import get_storage
@@ -103,3 +113,55 @@ def search_document(
         )
         for h in hits
     ]
+
+
+@router.post("/{document_id}/outputs", response_model=JobRead, status_code=202)
+def generate_output(
+    document_id: str, payload: GenerateRequest, db: Session = Depends(get_db)
+) -> Job:
+    """Enqueue claim-bound generation of one output (poll the job; result = output id)."""
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    if doc.status != "done":
+        raise HTTPException(status_code=409, detail="document ingestion not complete")
+
+    from app.generation.models import OutputType
+    from app.generation.specs import SPECS
+
+    try:
+        if OutputType(payload.output_type) not in SPECS:
+            raise ValueError
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail=f"unsupported output_type: {payload.output_type}"
+        ) from None
+
+    job = Job(document_id=document_id, status="pending", stage="queued")
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    _dispatch.enqueue_generation(job.id, document_id, payload.output_type, payload.language)
+    db.refresh(job)
+    return job
+
+
+@router.get("/{document_id}/outputs", response_model=list[OutputSummary])
+def list_outputs(document_id: str, db: Session = Depends(get_db)) -> list[OutputRecord]:
+    if db.get(Document, document_id) is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return list(
+        db.scalars(
+            select(OutputRecord)
+            .where(OutputRecord.document_id == document_id)
+            .order_by(OutputRecord.created_at)
+        )
+    )
+
+
+@router.get("/outputs/{output_id}", response_model=OutputDetail)
+def get_output(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
+    output = db.get(OutputRecord, output_id)
+    if output is None:
+        raise HTTPException(status_code=404, detail="output not found")
+    return output

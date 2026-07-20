@@ -69,8 +69,22 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
                 doc.status = "done"
         return "test-ingest-id"
 
+    # Generation pipeline: run inline (fallback generator + deterministic TrustLayer).
+    def _fake_generate(
+        self: object, job_id: str, document_id: str, output_type: str, language: str
+    ) -> str:
+        from app.generation.service import generate_output
+
+        output_id = generate_output(document_id, output_type, language)
+        with db.session_scope() as s:
+            job = s.get(Job, job_id)
+            if job is not None:
+                job.status, job.stage, job.result = "done", "done", output_id
+        return "test-gen-id"
+
     monkeypatch.setattr(stubs.CeleryTaskDispatch, "enqueue_pipeline", _fake_pipeline)
     monkeypatch.setattr(stubs.CeleryTaskDispatch, "enqueue_ingestion", _fake_ingest)
+    monkeypatch.setattr(stubs.CeleryTaskDispatch, "enqueue_generation", _fake_generate)
 
     from app.main import app
 

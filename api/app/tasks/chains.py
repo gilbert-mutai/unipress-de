@@ -157,3 +157,22 @@ def start_ingestion(job_id: str, document_id: str) -> str:
         ingest_finalize.s(job_id, document_id),
     )
     return workflow.apply_async().id
+
+
+@celery.task(name="generate.output")
+def task_generate(job_id: str, document_id: str, output_type: str, language: str) -> str:
+    from app.generation.service import generate_output
+
+    _set(job_id, status="processing", stage="generate")
+    try:
+        output_id = generate_output(document_id, output_type, language)
+    except Exception as exc:
+        _set(job_id, status="failed", error=str(exc))
+        raise
+    _set(job_id, status="done", stage="done", result=output_id)
+    return job_id
+
+
+def start_generation(job_id: str, document_id: str, output_type: str, language: str) -> str:
+    """Enqueue a single generation task. Job.result holds the output id when done."""
+    return task_generate.si(job_id, document_id, output_type, language).apply_async().id
