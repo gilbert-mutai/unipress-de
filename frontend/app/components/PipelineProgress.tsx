@@ -1,7 +1,13 @@
 import { DocumentRead } from "../lib/api";
-import { cn } from "../lib/utils";
 
-const STAGES = ["Parse", "Chunk", "Claims", "Embed"];
+const STAGE_LABEL: Record<string, string> = {
+  queued: "Queued",
+  parse: "Parsing the PDF",
+  chunk: "Splitting into passages",
+  extract: "Extracting claims",
+  embed: "Building the search index",
+  done: "Done",
+};
 
 function Stat({ label, value }: { label: string; value: number | null }) {
   return (
@@ -13,10 +19,7 @@ function Stat({ label, value }: { label: string; value: number | null }) {
 }
 
 export function PipelineProgress({ doc }: { doc: DocumentRead }) {
-  const done = doc.status === "done";
-  const failed = doc.status === "failed";
-
-  if (done) {
+  if (doc.status === "done") {
     return (
       <div className="mt-4 grid grid-cols-3 gap-3 animate-fade-up">
         <Stat label="Pages" value={doc.page_count} />
@@ -26,7 +29,7 @@ export function PipelineProgress({ doc }: { doc: DocumentRead }) {
     );
   }
 
-  if (failed) {
+  if (doc.status === "failed") {
     return (
       <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
         Ingestion failed{doc.error ? `: ${doc.error}` : ""}.
@@ -34,19 +37,23 @@ export function PipelineProgress({ doc }: { doc: DocumentRead }) {
     );
   }
 
+  const pct = doc.progress ?? 5;
+  const label = STAGE_LABEL[doc.stage ?? "queued"] ?? "Working";
+
   return (
     <div className="mt-4">
-      <div className="flex items-center gap-2 text-sm text-muted">
-        {STAGES.map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <span className={cn("h-2 w-2 rounded-full bg-brand", i === 0 && "animate-pulse")} />
-            <span>{s}</span>
-            {i < STAGES.length - 1 && <span className="text-line">→</span>}
-          </div>
-        ))}
+      <div className="mb-1.5 flex items-center justify-between text-sm">
+        <span className="flex items-center gap-2 text-ink">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-brand" />
+          {label}…
+        </span>
+        <span className="font-serif font-semibold tabular-nums text-muted">{pct}%</span>
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line/60">
-        <div className="skeleton h-full w-1/2 rounded-full bg-brand/40" />
+      <div className="h-2 overflow-hidden rounded-full bg-line/60">
+        <div
+          className="h-full rounded-full bg-brand transition-[width] duration-700 ease-out"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );

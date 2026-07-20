@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/fraunces";
 import "@fontsource-variable/inter";
-import { ShieldCheck } from "./components/icons";
+import { BrandMark } from "./components/brand-mark";
 import { ThemeToggle } from "./components/theme-toggle";
 import "./globals.css";
 
@@ -23,10 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="sticky top-0 z-20 border-b border-line bg-paper/80 backdrop-blur">
           <div className="mx-auto flex max-w-content items-center justify-between px-6 py-3">
-            <a href="/" className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-brand-fg">
-                <ShieldCheck className="h-4 w-4" />
-              </span>
+            <a href="/" className="flex items-center gap-2.5">
+              <BrandMark />
               <span className="font-serif text-lg font-semibold tracking-tight">UniPress DE</span>
             </a>
             <div className="flex items-center gap-3">

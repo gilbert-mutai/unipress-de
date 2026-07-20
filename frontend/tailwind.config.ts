@@ -26,10 +26,15 @@ const config: Config = {
         },
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
         shimmer: { "100%": { transform: "translateX(100%)" } },
+        indeterminate: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(320%)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.45s cubic-bezier(0.22,1,0.36,1) both",
         "fade-in": "fade-in 0.4s ease both",
+        indeterminate: "indeterminate 1.1s ease-in-out infinite",
       },
     },
   },

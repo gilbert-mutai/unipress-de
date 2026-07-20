@@ -95,18 +95,24 @@ export default function Home() {
     }
   }, [doc, outputType, language]);
 
+  const uploadTitle = doc ? "Source paper" : "Upload a paper";
+  const uploadHint = !doc
+    ? "A research paper in PDF format."
+    : doc.status === "done"
+      ? "Extracted into a verified claim store."
+      : doc.status === "failed"
+        ? "We couldn't read this PDF — try another file."
+        : "Reading and analyzing your paper…";
+
   return (
     <main className="mx-auto max-w-content px-6 pb-16">
       {/* Hero */}
       <section className="py-7">
-        <div className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1 text-xs text-muted">
-          <Sparkles className="h-3.5 w-3.5 text-brand" /> DEIK.AI Challenge 2026 · Category 2.C
-        </div>
         <h1 className="mt-3 max-w-3xl font-serif text-3xl font-semibold leading-[1.1] text-balance sm:text-4xl">
           Trustworthy, traceable science communication.
         </h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Bilingual press releases, articles, social &amp; video —{" "}
+          Bilingual press releases, articles, social &amp; video -{" "}
           <span className="text-ink">every claim linked to its source</span>.
         </p>
       </section>
@@ -120,7 +126,7 @@ export default function Home() {
       {/* Step 1 — upload */}
       <Card className="animate-fade-up">
         <CardBody>
-          <StepHeading n={1} title="Upload a paper" hint="A born-digital research PDF." />
+          <StepHeading n={1} title={uploadTitle} hint={uploadHint} />
           {!doc ? (
             <label
               onDragOver={(e) => {
@@ -194,6 +200,17 @@ export default function Home() {
                 {busy ? "Generating…" : "Generate"}
               </Button>
             </div>
+            {busy && (
+              <div className="mt-4">
+                <div className="mb-1.5 flex items-center gap-2 text-sm text-ink">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-brand" />
+                  Writing and verifying every sentence against its source…
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-line/60">
+                  <div className="h-full w-1/3 rounded-full bg-brand animate-indeterminate" />
+                </div>
+              </div>
+            )}
           </CardBody>
         </Card>
       )}

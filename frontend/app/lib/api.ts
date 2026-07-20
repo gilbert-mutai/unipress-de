@@ -8,6 +8,8 @@ export interface DocumentRead {
   id: string;
   filename: string;
   status: Status;
+  stage: string | null;
+  progress: number | null;
   page_count: number | null;
   chunk_count: number | null;
   claim_count: number | null;
