@@ -54,10 +54,11 @@ mlruns/
 wandb/
 
 # --- Data & documents (source papers, generated outputs — may have licensing constraints) ---
+# NOTE: anchored to repo root so they don't shadow source packages like api/app/outputs/.
 *.pdf
-uploads/
-outputs/
-tmp/
+/uploads/
+/outputs/
+/tmp/
 scratch/
 var/
 
