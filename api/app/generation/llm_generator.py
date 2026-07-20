@@ -73,7 +73,9 @@ def _needs_repair(output: GeneratedOutput) -> bool:
 def generate_llm(
     spec: OutputSpec, claims: list[ClaimInput], language: str, title_hint: str
 ) -> GeneratedOutput:
-    gateway = LiteLLMGateway(model=None)
+    from app.core.settings import get_settings
+
+    gateway = LiteLLMGateway(model=get_settings().llm_generation_model)
     user = _prompt(spec, claims, language)
     output = _parse(gateway.complete_json(_SYSTEM, user), spec, language, title_hint)
 
