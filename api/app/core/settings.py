@@ -52,14 +52,18 @@ class Settings(BaseSettings):
     llm_judge_model: str = Field(default="gpt-4o-mini")
     llm_generation_model: str = Field(default="gpt-4o")
 
-    # TrustLayer. nli_backend: "lexical" (proxy, default) | "nli" (DeBERTa, Phase 2b).
+    # TrustLayer. nli_backend: "lexical" (proxy, default) | "nli" (mDeBERTa XNLI).
     nli_backend: str = Field(default="lexical")
+    nli_model: str = Field(default="MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7")
+    llm_judge: bool = Field(default=False)  # Tier-2 judge, opt-in (needs a key)
     trust_w1: float = Field(default=0.4)  # entailment weight
     trust_w2: float = Field(default=0.4)  # judge supported-fraction weight
     trust_w3: float = Field(default=0.2)  # quote overlap weight
     trust_numeric_penalty: float = Field(default=0.6)
     trust_export_threshold: float = Field(default=0.7)
     trust_low_threshold: float = Field(default=0.45)
+    trust_entail_high: float = Field(default=0.85)  # skip judge if entail above this
+    trust_contradict_cutoff: float = Field(default=0.5)  # NLI contradiction => hard fail
 
     @property
     def otel_enabled(self) -> bool:
