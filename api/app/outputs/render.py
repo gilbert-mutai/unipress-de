@@ -25,7 +25,8 @@ _env = Environment(
 def _sections(record: OutputRecord) -> list[tuple[str | None, list]]:
     """Group sentences (already ordered) by their section slot, preserving order."""
     sentences = sorted(record.sentences, key=lambda s: s.order_index)
-    return [(section, list(group)) for section, group in groupby(sentences, key=lambda s: s.section)]
+    grouped = groupby(sentences, key=lambda s: s.section)
+    return [(section, list(group)) for section, group in grouped]
 
 
 def render_html(record: OutputRecord, source_filename: str) -> str:
