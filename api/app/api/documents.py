@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -165,3 +166,33 @@ def get_output(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
     if output is None:
         raise HTTPException(status_code=404, detail="output not found")
     return output
+
+
+@router.get("/outputs/{output_id}/render")
+def render_output(output_id: str, format: str = "html", db: Session = Depends(get_db)) -> Response:
+    """Render an output as HTML (default) or PDF, with evidence trail + attribution."""
+    output = db.get(OutputRecord, output_id)
+    if output is None:
+        raise HTTPException(status_code=404, detail="output not found")
+    doc = db.get(Document, output.document_id)
+    source_filename = doc.filename if doc else output.title
+
+    from app.outputs.render import render_html
+
+    if format == "html":
+        return HTMLResponse(content=render_html(output, source_filename))
+    if format == "pdf":
+        try:
+            from app.outputs.render import render_pdf
+
+            pdf = render_pdf(output, source_filename)
+        except (ImportError, OSError) as exc:  # WeasyPrint system libs missing
+            raise HTTPException(
+                status_code=501, detail=f"PDF rendering unavailable: {exc}"
+            ) from exc
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{output_id}.pdf"'},
+        )
+    raise HTTPException(status_code=400, detail="format must be 'html' or 'pdf'")

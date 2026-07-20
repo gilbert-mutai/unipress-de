@@ -10,6 +10,7 @@ x-app-env: &app-env
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-unipress}:${POSTGRES_PASSWORD:-unipress}@postgres:5432/${POSTGRES_DB:-unipress}
   REDIS_URL: redis://redis:6379/0
   STORAGE_ROOT: /data/storage
+  MANIFEST_PATH: /data/manifest/manifest.yaml
   CHROMA_URL: http://chroma:8000
   EMBED_MODEL: ${EMBED_MODEL:-intfloat/multilingual-e5-small}
   HF_HOME: /data/hf-cache
@@ -75,6 +76,7 @@ services:
     volumes:
       - storage:/data/storage
       - hfcache:/data/hf-cache
+      - ./data:/data/manifest:ro
     depends_on:
       postgres:
         condition: service_healthy

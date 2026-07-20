@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Blob storage root for uploaded PDFs + parse artifacts (shared api/worker volume).
     storage_root: str = Field(default="./var/storage")
 
+    # Source-document provenance for output attribution (best-effort; empty => skip).
+    manifest_path: str = Field(default="data/manifest.yaml")
+
     # Retrieval / embeddings.
     #   embed_backend: "sentence-transformers" (real) | "hashing" (deterministic, tests)
     #   embed_model: multilingual-e5-small by default (HU+EN, ~470MB); BGE-M3 is a
