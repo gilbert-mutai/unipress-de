@@ -96,19 +96,18 @@ export default function Home() {
   }, [doc, outputType, language]);
 
   return (
-    <main className="mx-auto max-w-content px-6 pb-24">
+    <main className="mx-auto max-w-content px-6 pb-16">
       {/* Hero */}
-      <section className="py-12 sm:py-16">
+      <section className="py-7">
         <div className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1 text-xs text-muted">
           <Sparkles className="h-3.5 w-3.5 text-brand" /> DEIK.AI Challenge 2026 · Category 2.C
         </div>
-        <h1 className="mt-5 max-w-3xl font-serif text-4xl font-semibold leading-[1.1] text-balance sm:text-5xl">
-          Turn a research paper into trustworthy, traceable communication.
+        <h1 className="mt-3 max-w-3xl font-serif text-3xl font-semibold leading-[1.1] text-balance sm:text-4xl">
+          Trustworthy, traceable science communication.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">
-          Press release, article, social, and video script — in English and Hungarian — where{" "}
-          <span className="text-ink">every claim is linked to its source</span> and audited for
-          hallucination before a human ever sees it.
+        <p className="mt-2 max-w-2xl text-muted">
+          Bilingual press releases, articles, social &amp; video —{" "}
+          <span className="text-ink">every claim linked to its source</span>.
         </p>
       </section>
 
@@ -135,7 +134,7 @@ export default function Home() {
                 if (e.dataTransfer.files?.[0]) onUpload(e.dataTransfer.files[0]);
               }}
               className={cn(
-                "mt-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors",
+                "mt-4 flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors",
                 dragging ? "border-brand bg-brand/[0.04]" : "border-line hover:border-brand/40",
               )}
             >
