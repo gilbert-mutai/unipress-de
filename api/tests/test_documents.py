@@ -37,3 +37,20 @@ def test_upload_rejects_non_pdf(client: TestClient) -> None:
 
 def test_get_missing_document(client: TestClient) -> None:
     assert client.get("/documents/nope").status_code == 404
+
+
+def test_page_image_renders_png(client: TestClient) -> None:
+    data = make_pdf(["1. Introduction\n\n" + KNOWN_SENTENCE])
+    doc = client.post("/documents", files={"file": ("p.pdf", data, "application/pdf")}).json()
+    r = client.get(f"/documents/{doc['id']}/pages/1.png", params={"bbox": "72,72,300,120"})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"  # PNG magic bytes
+
+
+def test_page_image_bad_bbox(client: TestClient) -> None:
+    data = make_pdf(["hello world one two three four five six seven eight nine ten"])
+    doc = client.post("/documents", files={"file": ("p.pdf", data, "application/pdf")}).json()
+    assert (
+        client.get(f"/documents/{doc['id']}/pages/1.png", params={"bbox": "1,2"}).status_code == 400
+    )

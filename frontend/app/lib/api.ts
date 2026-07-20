@@ -23,6 +23,7 @@ export interface ClaimRead {
   page: number;
   section: string | null;
   quote: string;
+  bbox: number[] | null;
   importance: number;
   numeric: boolean;
 }
@@ -122,4 +123,14 @@ export async function getOutput(outputId: string): Promise<OutputDetail> {
 
 export function renderUrl(outputId: string, format: "html" | "pdf"): string {
   return `${API_BASE}/documents/outputs/${outputId}/render?format=${format}`;
+}
+
+/** URL of a source page rendered to PNG, with an optional highlighted bbox. */
+export function pageImageUrl(
+  documentId: string,
+  page: number,
+  bbox?: number[] | null,
+): string {
+  const q = bbox && bbox.length === 4 ? `?bbox=${bbox.join(",")}` : "";
+  return `${API_BASE}/documents/${documentId}/pages/${page}.png${q}`;
 }
