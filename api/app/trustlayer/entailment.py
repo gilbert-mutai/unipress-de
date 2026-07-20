@@ -1,14 +1,16 @@
 """Entailment (Tier-1) behind a port.
 
-`LexicalEntailment` is a dependency-free proxy (fraction of the hypothesis's
-content words found in the premise) — enough to run and test the TrustLayer with
-no model. Phase 2b adds a real DeBERTa/mDeBERTa NLI backend implementing the same
-port, selected via settings.
+`classify()` returns 3-way NLI scores (entail / neutral / contradict).
+`LexicalEntailment` is a dependency-free proxy (word overlap; it cannot detect
+contradiction, so `contradict` is always 0) — enough to run and test the
+TrustLayer with no model. The real `DebertaNLI` backend (app/trustlayer/nli.py)
+implements the same port and is selected via settings.nli_backend="nli".
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 _TOKEN = re.compile(r"\w+", re.UNICODE)
@@ -52,13 +54,26 @@ def content_tokens(text: str) -> list[str]:
     return [t for t in _TOKEN.findall(text.lower()) if t not in _STOPWORDS and len(t) > 1]
 
 
+@dataclass
+class NLIScores:
+    entail: float
+    neutral: float
+    contradict: float
+
+
 @runtime_checkable
 class Entailment(Protocol):
+    def classify(self, premise: str, hypothesis: str) -> NLIScores: ...
+
     def entail_prob(self, premise: str, hypothesis: str) -> float: ...
 
 
 class LexicalEntailment:
-    """Proxy P(entail): share of hypothesis content words present in the premise."""
+    """Proxy: share of hypothesis content words present in the premise (no contradiction signal)."""
+
+    def classify(self, premise: str, hypothesis: str) -> NLIScores:
+        e = self.entail_prob(premise, hypothesis)
+        return NLIScores(entail=e, neutral=1.0 - e, contradict=0.0)
 
     def entail_prob(self, premise: str, hypothesis: str) -> float:
         hyp = content_tokens(hypothesis)
@@ -78,7 +93,7 @@ def get_entailment() -> Entailment:
         from app.core.settings import get_settings
 
         if get_settings().nli_backend == "nli":
-            from app.trustlayer.nli import DebertaNLI  # Phase 2b
+            from app.trustlayer.nli import DebertaNLI
 
             ent = DebertaNLI()
         else:

@@ -128,4 +128,5 @@ class OutputSummary(BaseModel):
 
 
 class OutputDetail(OutputSummary):
+    coverage: dict | None = None
     sentences: list[SentenceRead] = []

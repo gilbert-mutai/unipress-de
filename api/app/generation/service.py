@@ -10,6 +10,7 @@ from app.db_models import Document, OutputRecord, SentenceRecord
 from app.generation.fallback import ClaimInput, generate_fallback
 from app.generation.models import GeneratedOutput, OutputSpec, OutputType
 from app.generation.specs import get_spec
+from app.trustlayer.coverage import coverage_report
 from app.trustlayer.verify import ClaimEvidence, verify_output
 
 log = get_logger("generation.service")
@@ -49,6 +50,7 @@ def generate_output(document_id: str, output_type: str, language: str) -> str:
 
     output = _generate(spec, claims, language, title_hint)
     verify_output(output, evidence)  # TrustLayer: verdict + confidence per sentence
+    coverage = coverage_report(claims, output)  # document-level: omissions, dropped caveats
 
     with session_scope() as s:
         record = OutputRecord(
@@ -57,6 +59,7 @@ def generate_output(document_id: str, output_type: str, language: str) -> str:
             language=language,
             title=output.title,
             status="done",
+            coverage=coverage,
         )
         s.add(record)
         s.flush()

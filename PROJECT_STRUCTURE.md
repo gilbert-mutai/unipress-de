@@ -1,13 +1,13 @@
 # UniPress DE — Project Structure
 
 > Documentation of the repository layout, components, and data flow.
-> **Reflects the codebase as of Phase 2a.** The full production stack runs
-> end-to-end (Phase 0); **PDF ingestion → chunking** (1a), **quote-verified claim
-> extraction** (1b), **embeddings → Chroma retrieval** (1c), and **claim-bound
-> generation + the deterministic TrustLayer core** (2a) are implemented and
-> verified. The real NLI model + LLM judge (2b) are still ahead — see the
-> [Status & maturity](#status--maturity) section. Everything below is based on the
-> actual committed files, not planned features.
+> **Reflects the codebase as of Phase 2 (complete).** The full production stack
+> runs end-to-end (Phase 0); **PDF ingestion → chunking** (1a), **quote-verified
+> claim extraction** (1b), **embeddings → Chroma retrieval** (1c), and
+> **claim-bound generation + the full TrustLayer** (2a numeric/overlap core +
+> 2b NLI, LLM judge, coverage) are implemented and verified. Phase 3 (bilingual
+> outputs + rendering) is next — see [Status & maturity](#status--maturity).
+> Everything below is based on the actual committed files, not planned features.
 >
 > 🔄 **This is a living document — keep it current.** Whenever a change adds or
 > removes a service, entry point, route, model, migration, env var, dependency,
@@ -77,9 +77,12 @@ unipress-de/
 │   │   │   └── service.py       #   generate → verify → persist
 │   │   ├── trustlayer/          # Verify each sentence vs its cited source (docs/03 §5)
 │   │   │   ├── numeric.py       #   Numeric-mismatch check (hard fail)
-│   │   │   ├── entailment.py    #   Entailment port + lexical proxy (NLI in 2b)
+│   │   │   ├── entailment.py    #   Entailment port + lexical proxy; classify() 3-way
+│   │   │   ├── nli.py           #   DebertaNLI (mDeBERTa-XNLI, opt-in via nli_backend)
+│   │   │   ├── judge.py         #   Tier-2 LLM judge (gpt-4o-mini, opt-in)
 │   │   │   ├── scorer.py        #   Confidence blend + numeric penalty
-│   │   │   └── verify.py        #   Per-sentence verdict + confidence
+│   │   │   ├── coverage.py      #   Document-level coverage (dropped-caveat warnings)
+│   │   │   └── verify.py        #   T1 gating → T2 judge → verdict + confidence
 │   │   ├── llm/                 # LLM access
 │   │   │   └── gateway.py       #   LiteLLMGateway (LLMGateway port; retry/timeout)
 │   │   ├── ports/               # Hexagonal interfaces (Protocols)
@@ -96,7 +99,8 @@ unipress-de/
 │   │       ├── 0001_initial.py  #   Creates the `jobs` table
 │   │       ├── 0002_documents_chunks.py  # documents + chunks tables; jobs.document_id
 │   │       ├── 0003_claims.py   #   claims table; documents.claim_count
-│   │       └── 0004_outputs.py  #   outputs + output_sentences tables
+│   │       ├── 0004_outputs.py  #   outputs + output_sentences tables
+│   │       └── 0005_output_coverage.py  # outputs.coverage (document-level report)
 │   ├── alembic.ini
 │   ├── tests/                   # pytest suite (SQLite-backed, no infra needed)
 │   │   ├── conftest.py
@@ -286,6 +290,7 @@ payloads cross the broker and each stage is idempotent.
 - **`0002_documents_chunks`** ([versions/0002_documents_chunks.py](api/alembic/versions/0002_documents_chunks.py)) — `documents` + `chunks` tables (FK `chunks.document_id → documents.id`, cascade) and `jobs.document_id`.
 - **`0003_claims`** ([versions/0003_claims.py](api/alembic/versions/0003_claims.py)) — `claims` table (FK to `documents`, cascade) and `documents.claim_count`.
 - **`0004_outputs`** ([versions/0004_outputs.py](api/alembic/versions/0004_outputs.py)) — `outputs` + `output_sentences` tables (cascade), holding generated outputs and per-sentence verdicts.
+- **`0005_output_coverage`** ([versions/0005_output_coverage.py](api/alembic/versions/0005_output_coverage.py)) — `outputs.coverage` JSON (document-level coverage report).
 - Migrations run via a **one-shot `migrate` service** in Compose that must complete successfully before `api`/`worker` start (`service_completed_successfully`).
 
 ### 5.7 Tests (`api/tests/`)
@@ -498,8 +503,8 @@ flowchart LR
 | **Claim extraction (quote-verified `Claim` store; heuristic + opt-in LLM)** | **Implemented & verified** (Phase 1b) |
 | **Embeddings → Chroma retrieval + semantic search** | **Implemented & verified** (Phase 1c) |
 | Reranker (bge-reranker); eval gold set + MLflow A/B | **Not started** (rest of Phase 1) |
-| **Claim-bound generation + TrustLayer core (numeric/overlap/verdict)** | **Implemented & verified** (Phase 2a) |
-| Real NLI model + LLM judge; coverage/consistency checks | **Not started** (Phase 2b) |
+| **Claim-bound generation + TrustLayer (numeric, NLI, judge, coverage)** | **Implemented & verified** (Phase 2a+2b) |
+| Pairwise-NLI consistency check; thresholds tuning → MLflow | **Deferred** (Phase 5 harness) |
 | Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
 
 No files in the committed tree appear **dead or deprecated** — everything present
