@@ -77,16 +77,15 @@ def _setup_infra() -> Any:
     return db
 
 
-def _ingest(db: Any, pdf: Path) -> str:
+def _ingest(db: Any, filename: str, data: bytes) -> str:
     from app.adapters.stubs import LocalStorage
     from app.claims.service import extract_stage
     from app.db_models import Document
     from app.ingestion.service import chunk_stage, parse_stage
     from app.retrieval.service import embed_stage
 
-    data = pdf.read_bytes()
     with db.session_scope() as s:
-        doc = Document(filename=pdf.name, content_key="", status="pending")
+        doc = Document(filename=filename, content_key="", status="pending")
         s.add(doc)
         s.flush()
         doc_id = doc.id
@@ -98,6 +97,33 @@ def _ingest(db: Any, pdf: Path) -> str:
     extract_stage(doc_id)
     embed_stage(doc_id)
     return doc_id
+
+
+# A committed-free, service-free fixture paper for the CI eval-gate: the real sample
+# PDFs are gitignored (licensing + size), so CI runs the harness on this synthetic,
+# claim-dense abstract built in-memory with PyMuPDF — the "small fixed set" of docs/05 §8.
+_SYNTHETIC_TEXT = (
+    "Abstract\n\n"
+    "We present a novel screening method for early cancer detection from routine imaging. "
+    "The system achieved 88.8% accuracy across 339 clinical samples in a retrospective study. "
+    "Our approach reduced false negatives by 42% compared with the manual baseline. "
+    "The model processed over 12 million individual cell predictions during evaluation. "
+    "These results suggest the method could assist clinicians in high-volume screening settings. "
+    "However, the approach is limited to born-digital images and has not been validated prospectively.\n\n"
+    "1. Introduction\n\n"
+    "Cervical cancer screening remains labour-intensive and error-prone. "
+    "Prior automated methods report accuracy between 70% and 85% but generalise poorly. "
+    "We address this gap with a claim-bound deep learning pipeline evaluated on a curated cohort."
+)
+
+
+def _synthetic_pdf() -> bytes:
+    import fitz  # PyMuPDF
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_textbox(fitz.Rect(56, 56, 540, 760), _SYNTHETIC_TEXT, fontsize=11)
+    return doc.tobytes()
 
 
 def _generate(db: Any, doc_id: str, output_type: str, language: str) -> dict[str, Any]:
@@ -253,7 +279,10 @@ def _markdown(report: dict[str, Any]) -> str:
 # --------------------------------------------------------------------------- main
 
 
-def _select_papers(requested: list[str] | None) -> list[dict[str, Any]]:
+def _select_papers(requested: list[str] | None, synthetic: bool) -> list[dict[str, Any]]:
+    if synthetic:
+        return [{"id": "synthetic_fixture", "data": _synthetic_pdf(),
+                 "filename": "synthetic.pdf", "language": "en"}]
     manifest = yaml.safe_load(MANIFEST.read_text())
     docs = manifest["documents"]
     papers = []
@@ -266,7 +295,8 @@ def _select_papers(requested: list[str] | None) -> list[dict[str, Any]]:
         if not pdf.exists():
             print(f"  ! skipping {d['id']}: PDF not found at {pdf}", file=sys.stderr)
             continue
-        papers.append({"id": d["id"], "pdf": pdf, "language": d.get("language", "en")})
+        papers.append({"id": d["id"], "data": pdf.read_bytes(),
+                       "filename": pdf.name, "language": d.get("language", "en")})
     return papers
 
 
@@ -275,11 +305,13 @@ def main() -> int:
     ap.add_argument("--papers", nargs="*", help="manifest ids (default: all research papers)")
     ap.add_argument("--outputs", nargs="*", default=DEFAULT_OUTPUTS, help="output types")
     ap.add_argument("--label", default="", help="report dir label")
+    ap.add_argument("--synthetic", action="store_true",
+                    help="run on an in-memory fixture paper (no external PDFs — CI eval-gate)")
     ap.add_argument("--fail-on-target-miss", action="store_true",
                     help="exit non-zero if a headline target is missed (CI eval-gate)")
     args = ap.parse_args()
 
-    papers = _select_papers(args.papers)
+    papers = _select_papers(args.papers, args.synthetic)
     if not papers:
         print("No papers to evaluate (are the sample PDFs present?)", file=sys.stderr)
         return 2
@@ -288,7 +320,7 @@ def main() -> int:
     rows: list[dict[str, Any]] = []
     for p in papers:
         print(f"→ {p['id']} ({p['language']})")
-        doc_id = _ingest(db, p["pdf"])
+        doc_id = _ingest(db, p["filename"], p["data"])
         gold = _load_gold(p["id"])
         for output_type in args.outputs:
             run = _generate(db, doc_id, output_type, p["language"])
