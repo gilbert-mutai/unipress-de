@@ -232,6 +232,53 @@ def _target_check(agg: dict[str, Any]) -> list[dict[str, Any]]:
     return checks
 
 
+HEADLINE_METRICS = ["hallucination_rate", "faithfulness", "claim_precision",
+                    "evidence_link_validity", "quality_score"]
+
+
+def _default_mlflow_uri() -> str:
+    import os
+
+    return os.environ.get("MLFLOW_TRACKING_URI") or f"file:{REPO / 'mlruns'}"
+
+
+def _log_mlflow(report: dict[str, Any], uri: str, report_dir: Path) -> None:
+    """Log the run to MLflow: aggregate + per-output nested runs + the report artifacts.
+
+    Every eval run becomes a versioned, comparable experiment (docs/05 §8). Uses a
+    local ``file:`` store by default so it needs no server; point MLFLOW_TRACKING_URI
+    (or --mlflow-uri) at the compose ``mlflow`` service to publish to the shared UI.
+    """
+    import mlflow
+
+    mlflow.set_tracking_uri(uri)
+    mlflow.set_experiment("unipress-eval")
+    agg = report["aggregate"]
+    with mlflow.start_run(run_name=report["label"] or report["run_at"]):
+        mlflow.log_params({
+            "generator": report["generator"],
+            "papers": ",".join(report["papers"]),
+            "n_runs": agg.get("runs", 0),
+        })
+        for k, v in agg.items():
+            if isinstance(v, (int, float)):
+                mlflow.log_metric(f"agg.{k}", float(v))
+        for c in report["target_checks"]:
+            mlflow.log_metric(f"target_met.{c['metric']}", 1.0 if c["met"] else 0.0)
+        mlflow.log_artifacts(str(report_dir), artifact_path="report")
+        for row in report["rows"]:
+            name = f"{row['paper']}.{row['output_type']}.{row['language']}"
+            with mlflow.start_run(run_name=name, nested=True):
+                mlflow.log_params({"paper": row["paper"], "output_type": row["output_type"],
+                                   "language": row["language"]})
+                m = row["metrics"]
+                for k in HEADLINE_METRICS:
+                    mlflow.log_metric(k, float(m[k]))
+                mlflow.log_metric("readability.reading_ease", float(m["readability"]["reading_ease"]))
+                mlflow.log_metric("readability.band_hit", 1.0 if m["readability"]["band_hit"] else 0.0)
+    print(f"MLflow: logged to {uri} (experiment 'unipress-eval')")
+
+
 def _write_report(report: dict[str, Any], label: str) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     name = f"{stamp}-{label}" if label else stamp
@@ -309,6 +356,9 @@ def main() -> int:
                     help="run on an in-memory fixture paper (no external PDFs — CI eval-gate)")
     ap.add_argument("--fail-on-target-miss", action="store_true",
                     help="exit non-zero if a headline target is missed (CI eval-gate)")
+    ap.add_argument("--mlflow", action="store_true", help="log the run to MLflow")
+    ap.add_argument("--mlflow-uri", default=None,
+                    help="MLflow tracking URI (default: $MLFLOW_TRACKING_URI or file:./mlruns)")
     args = ap.parse_args()
 
     papers = _select_papers(args.papers, args.synthetic)
@@ -342,6 +392,8 @@ def main() -> int:
         "target_checks": checks,
     }
     out = _write_report(report, args.label)
+    if args.mlflow:
+        _log_mlflow(report, args.mlflow_uri or _default_mlflow_uri(), out)
     print(f"\nReport → {out.relative_to(REPO)}")
     print(f"Aggregate: halluc={agg['hallucination_rate']} faith={agg['faithfulness']} "
           f"quality={agg['quality_score']}")

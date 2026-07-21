@@ -47,6 +47,13 @@ dev = [
 eval = [
     "textstat>=0.7",
 ]
+# MLflow tracking (eval/run_eval.py --mlflow, eval/retrieval_ab.py). Separate from
+# `eval` so the lean CI eval-gate doesn't pull mlflow's large dependency tree.
+# Pinned to the 2.x line to match the compose `mlflow` server image (v2.19.0) —
+# a client/server major skew corrupts the shared backend store (cf. the Chroma pin).
+mlflow = [
+    "mlflow>=2.19,<3",
+]
 
 # CPU-only torch (docs/07): avoids multi-GB CUDA wheels. sentence-transformers
 # pulls torch; force it to resolve from PyTorch's CPU index.
