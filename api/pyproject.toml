@@ -42,6 +42,11 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28",
 ]
+# Evaluation harness (eval/run_eval.py). Kept in its own group so the runtime
+# image stays lean; installed in CI + dev for the eval-gate.
+eval = [
+    "textstat>=0.7",
+]
 
 # CPU-only torch (docs/07): avoids multi-GB CUDA wheels. sentence-transformers
 # pulls torch; force it to resolve from PyTorch's CPU index.

@@ -29,7 +29,7 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 | **P2** ✅ | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
 | **P3** ✅ | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
 | **P4** ✅ | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
-| **P5** | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board | 47 |
+| **P5** 🚧 | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board · *harness done* | 47 |
 | **P6** | Deploy, harden & demo | W9–W10 | Sep 14 – Sep 25 | Angani VM, TLS, rehearse, **freeze** | 52 |
 
 > P5 overlaps P4 by design — the gold set and metrics accrue while the frontend is built. **Feature freeze: Mon 22 Sep**; Tue 23 – Fri 25 is rehearsal + contingency buffer.
@@ -214,6 +214,11 @@ gantt
 - Grafana shows live ops + eval metrics with the full stack running.
 
 **Risks:** eval targets not met by MVP → the harness *is* the tuning loop (threshold/weight tuning from P2 continues here); scope the gold set to the sample corpus first, external papers optional (`06` §7).
+
+**Status — 🚧 in progress. Workstream A (eval harness) ✅ delivered (21 Jul 2026).**
+- **Built:** `eval/` — `metrics.py` (pure, unit-tested docs/05 metrics: hallucination rate, faithfulness, claim precision, evidence-link validity, Flesch/HU readability vs per-type floors, gold coverage + adversarial-caught hooks, trust-weighted quality score §5) and `run_eval.py`, which runs the **real pipeline end-to-end in-process** (parse → chunk → extract → embed → generate → TrustLayer) on the sample papers with throwaway service-free infra (in-memory SQLite, hashing embedder, in-memory store) — no key, no Docker, reproducible. Writes timestamped JSON + Markdown to `eval/reports/` (gitignored); checks the §6 MVP target bars; `--fail-on-target-miss` gives CI the eval-gate hook. `textstat` added as an `eval` dependency group. `eval/gold/<paper_id>.yaml` schema documented (`eval/README.md`) — gold-based metrics activate the moment a frozen file lands.
+- **Verified:** 11 metric unit tests green (ruff clean); full baseline run = **4 research papers × 5 outputs = 20 runs**, aggregate faithfulness 1.0 / hallucination 0.0 (fallback is grounded by construction), quality 93.1. Honest finding surfaced: **readability band-hit only 0.45** — verbatim academic claims are often too dense to clear the accessible-reading floor, which quantifies why the LLM rewrite path matters.
+- **Remaining in P5:** **B** — human-verified gold + adversarial set (also closes the P1 tail); **C** — MLflow tracking + retrieval A/B; **D** — CI eval-gate wired in GitHub Actions; **E** — Grafana board (per-stage latency, token cost, cache-hit, queue depth + live eval series).
 
 ---
 

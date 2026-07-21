@@ -58,6 +58,7 @@ wandb/
 *.pdf
 /uploads/
 /outputs/
+/eval/reports/
 /tmp/
 scratch/
 var/
