@@ -30,3 +30,6 @@ celery.conf.update(
 # Wire tracing in the worker process too, so api -> worker spans connect.
 setup_tracing(settings)
 instrument_celery()
+
+# Register the worker's Prometheus metrics HTTP server (no-op unless configured).
+from app.tasks import metrics_server  # noqa: E402,F401

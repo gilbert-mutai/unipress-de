@@ -11,6 +11,7 @@ from app.claims.heuristic import extract_claims
 from app.claims.models import Claim as ClaimModel
 from app.core.db import session_scope
 from app.core.logging import get_logger
+from app.core.metrics import timed_stage
 from app.core.settings import get_settings
 from app.db_models import Chunk as ChunkRow
 from app.db_models import Claim as ClaimRow
@@ -50,6 +51,7 @@ def _run_extractor(chunks: list[Chunk]) -> list[ClaimModel]:
     return extract_claims(chunks)
 
 
+@timed_stage("extract")
 def extract_stage(document_id: str) -> int:
     """Extract + persist claims for a document. Returns the claim count."""
     with session_scope() as s:

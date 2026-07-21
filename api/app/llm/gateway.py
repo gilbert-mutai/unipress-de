@@ -38,6 +38,9 @@ class LiteLLMGateway:
             timeout=self.timeout,
             **kwargs,
         )
+        from app.core.metrics import record_llm_usage
+
+        record_llm_usage(self.model, resp)
         return resp.choices[0].message.content or ""
 
     def complete(self, prompt: str, **kwargs: object) -> str:

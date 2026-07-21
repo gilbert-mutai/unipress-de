@@ -1,0 +1,14 @@
+apiVersion: 1
+providers:
+  - name: UniPress
+    orgId: 1
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      # JSON dashboards live alongside this provider file (the whole provisioning
+      # dir is mounted read-only into the container by docker-compose).
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

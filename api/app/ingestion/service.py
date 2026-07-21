@@ -11,6 +11,7 @@ from __future__ import annotations
 from app.adapters.stubs import LocalStorage
 from app.core.db import session_scope
 from app.core.logging import get_logger
+from app.core.metrics import timed_stage
 from app.db_models import Chunk, Document
 from app.ingestion.chunker import chunk_document
 from app.ingestion.models import ParsedDoc
@@ -23,6 +24,7 @@ def _parsed_key(document_id: str) -> str:
     return f"{document_id}/parsed.json"
 
 
+@timed_stage("parse")
 def parse_stage(document_id: str) -> None:
     """Load the raw PDF, parse it, persist the parsed artifact + page metadata."""
     storage = LocalStorage()
@@ -43,6 +45,7 @@ def parse_stage(document_id: str) -> None:
         doc.warnings = parsed.warnings or None
 
 
+@timed_stage("chunk")
 def chunk_stage(document_id: str) -> int:
     """Load the parsed artifact, chunk it, persist Chunk rows. Returns chunk count."""
     storage = LocalStorage()

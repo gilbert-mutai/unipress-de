@@ -59,4 +59,29 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
 
-  # Eval gate lands in Phase 5; placeholder keeps the job name stable in branch protection.
+  eval-gate:
+    name: eval-gate (metrics · regression · target bars)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.13"
+
+      # The eval dependency group (textstat) is not installed by default.
+      - name: Sync dependencies (+ eval group)
+        run: uv sync --frozen --group eval
+
+      # Metrics + the gate's fail-on-regression logic.
+      - name: Eval unit tests
+        run: uv run pytest ../eval/tests -q
+
+      # Run the harness on the in-memory synthetic fixture (real PDFs are gitignored),
+      # failing the build if a headline metric regresses past the docs/05 §6 bars.
+      - name: Eval-gate (synthetic fixture)
+        run: uv run python ../eval/run_eval.py --synthetic --fail-on-target-miss --label ci

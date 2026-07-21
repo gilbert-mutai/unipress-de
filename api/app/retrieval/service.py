@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app.core.db import session_scope
 from app.core.logging import get_logger
+from app.core.metrics import timed_stage
 from app.core.settings import get_settings
 from app.db_models import Chunk as ChunkRow
 from app.ports import VectorStore
@@ -53,6 +54,7 @@ def _metadata(row: ChunkRow) -> dict[str, object]:
     return meta
 
 
+@timed_stage("embed")
 def embed_stage(document_id: str) -> int:
     """Embed a document's chunks into the vector store (idempotent). Returns count."""
     with session_scope() as s:

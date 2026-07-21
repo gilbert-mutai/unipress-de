@@ -58,6 +58,8 @@ wandb/
 *.pdf
 /uploads/
 /outputs/
+/eval/reports/
+/eval/gold/*.candidate.yaml
 /tmp/
 scratch/
 var/
