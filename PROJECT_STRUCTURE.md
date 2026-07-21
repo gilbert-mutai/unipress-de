@@ -1,15 +1,16 @@
 # UniPress DE — Project Structure
 
 > Documentation of the repository layout, components, and data flow.
-> **Reflects the codebase as of Phase 4.** The full production stack runs
+> **Reflects the codebase as of Phase 4 + product-polish pass.** The full stack runs
 > end-to-end (Phase 0); **ingestion → chunking** (1a), **quote-verified claim
 > extraction** (1b), **embeddings → Chroma retrieval** (1c), **claim-bound
-> generation + the full TrustLayer** (2), and **5 output types + HTML/PDF rendering
-> with evidence trail + attribution** (3) are implemented and verified; the
-> **Next.js review dashboard** (4) is built and type-checks (live browser
-> walkthrough pending a running stack). Phase 5 (eval + observability) is next —
-> see [Status & maturity](#status--maturity). Everything below is based on the
-> actual committed files, not planned features.
+> generation + the full TrustLayer** (2), **5 output types + HTML/PDF rendering
+> with evidence trail + attribution** (3), and the **Next.js review dashboard** (4)
+> are implemented and **verified live on the running stack** — including an
+> editorial UI redesign, real ingestion progress %, and a real-PDF source-highlight
+> panel. Phase 5 (eval + observability) is next — see
+> [Status & maturity](#status--maturity). Everything below is based on the actual
+> committed files, not planned features.
 >
 > 🔄 **This is a living document — keep it current.** Whenever a change adds or
 > removes a service, entry point, route, model, migration, env var, dependency,
@@ -58,6 +59,7 @@ unipress-de/
 │   │   │   ├── models.py        #   SourceSpan, Block, Page, ParsedDoc, Chunk (Pydantic)
 │   │   │   ├── parser.py        #   PyMuPDF parse: text + bbox, image-only detection
 │   │   │   ├── chunker.py       #   Structure-aware chunking with exact provenance
+│   │   │   ├── pageimage.py     #   Render a source page → PNG with the cited span highlighted
 │   │   │   └── service.py       #   parse_stage / chunk_stage (persist; used by tasks)
 │   │   ├── claims/              # Chunks → atomic, quote-verified claims
 │   │   │   ├── models.py        #   ClaimType, Claim (Pydantic)
@@ -127,13 +129,21 @@ unipress-de/
 ├── worker/
 │   └── README.md                # Explains the worker shares api/'s image (no build yet)
 │
-├── frontend/                    # Next.js 14 (App Router) + TypeScript + Tailwind
+├── frontend/                    # Next.js 14 (App Router) + TypeScript + Tailwind (editorial design system)
 │   ├── app/
-│   │   ├── layout.tsx           #   Root layout + metadata
+│   │   ├── layout.tsx           #   Root layout: fonts (@fontsource Fraunces+Inter), header, theme
 │   │   ├── page.tsx             #   ★ Review dashboard: upload → progress → generate → review
-│   │   ├── lib/api.ts           #   Typed API client (documents/claims/outputs/render)
-│   │   ├── components/EvidenceReview.tsx  # Sentence↔source highlight, badges, accept/flag, export
-│   │   └── globals.css          #   Tailwind entry + base styles
+│   │   ├── globals.css          #   Tailwind + editorial tokens (warm palette, light/dark)
+│   │   ├── lib/api.ts           #   Typed API client (documents/claims/outputs/render/pageImage)
+│   │   ├── lib/utils.ts         #   cn() (clsx + tailwind-merge)
+│   │   └── components/
+│   │       ├── EvidenceReview.tsx  # Sentence↔source: verdict badges + real-PDF-page highlight, accept/flag, export
+│   │       ├── PipelineProgress.tsx # Determinate ingestion progress (stage + %) / stat tiles
+│   │       ├── brand-mark.tsx      # UD logo (/ud-logo.svg) with shield fallback
+│   │       ├── theme-toggle.tsx    # Light/dark toggle (no-flash)
+│   │       ├── icons.tsx           # Hand-rolled SVG icons (no icon-lib dep)
+│   │       └── ui/{button,card,badge}.tsx  # Primitives (CVA variants, VerdictBadge)
+│   ├── public/ud-logo.svg       # University of Debrecen logo (served at /ud-logo.svg)
 │   ├── package.json
 │   ├── pnpm-lock.yaml
 │   ├── next.config.mjs          # Standalone output build
@@ -234,7 +244,7 @@ ML-heavy image once embeddings/NLI land.
 | File | Type | Contents |
 |---|---|---|
 | [`db_models.py`](api/app/db_models.py) | SQLAlchemy ORM | `Job`, `Document`, `Chunk`, `Claim`, plus `OutputRecord` (a generated output) and `SentenceRecord` (a generated sentence with role/claim_ids/verdict/confidence/rationale). |
-| [`models.py`](api/app/models.py) | Pydantic | API contracts: `JobRead`, `DocumentRead`, `ChunkRead`, `ClaimRead`, `SearchHit`, `GenerateRequest`, `OutputSummary`/`OutputDetail`, `SentenceRead`. |
+| [`models.py`](api/app/models.py) | Pydantic | API contracts: `JobRead`, `DocumentRead` (incl. `stage`/`progress` for the UI bar), `ChunkRead`, `ClaimRead` (incl. `bbox`), `SearchHit`, `GenerateRequest`, `OutputSummary`/`OutputDetail`, `SentenceRead`. |
 | [`ingestion/models.py`](api/app/ingestion/models.py) | Pydantic | `SourceSpan` (docs/03 §1.1), `Block`, `Page`, `ParsedDoc`, `Chunk`. |
 | [`claims/models.py`](api/app/claims/models.py) | Pydantic | `ClaimType` (docs/03 §2.2), `Claim` (docs/03 §1.2). |
 | [`generation/models.py`](api/app/generation/models.py) | Pydantic | `OutputType`, `SentenceRole`, `Verdict`, `GeneratedSentence`/`GeneratedOutput` (docs/03 §1.3–1.4), `OutputSpec`. |
@@ -266,6 +276,7 @@ satisfies a port — [`tests/test_jobs.py`](api/tests/test_jobs.py) asserts exac
 | `GET /documents/{id}` | `documents.py` | Ingestion status: page/chunk counts, warnings, errors (404 if missing). |
 | `GET /documents/{id}/chunks` | `documents.py` | Ordered chunks with spans (page/section/offsets/bbox) — the evidence-highlight source. |
 | `GET /documents/{id}/claims` | `documents.py` | Extracted claims: text, type, quote, span, numeric flag, importance. |
+| `GET /documents/{id}/pages/{n}.png` | `documents.py` | Source page rendered to PNG, optionally highlighting a cited `bbox` — powers the review UI's source panel. |
 | `POST /documents/{id}/search` | `documents.py` | Semantic search (RAG retrieval): embeds the query, queries the vector store, returns span-linked chunk hits with scores. |
 | `POST /documents/{id}/outputs` | `documents.py` | Enqueue claim-bound generation of one output type/language (202; poll job, `result` = output id). |
 | `GET /documents/{id}/outputs` | `documents.py` | List generated outputs for a document. |
@@ -322,20 +333,24 @@ integration (real Postgres/Redis) and the eval harness arrive in later phases
 
 ## 6. Frontend (`frontend/`)
 
-A Next.js 14 App Router application (TypeScript + Tailwind).
+A Next.js 14 App Router application (TypeScript + Tailwind) with an **editorial
+design system**: warm "paper" palette, serif display (Fraunces) + sans UI (Inter)
+via bundled `@fontsource-variable` packages, CSS-variable tokens with light/dark,
+and small CVA-based UI primitives (no external component/icon library).
 
 | File | Role |
 |---|---|
-| [`app/page.tsx`](frontend/app/page.tsx) | The review dashboard: 3-step flow — **upload** a PDF → poll ingestion status → **generate** an output (type + language) by polling the generation job → **review**. |
-| [`app/components/EvidenceReview.tsx`](frontend/app/components/EvidenceReview.tsx) | Side-by-side review: sentences with verdict/confidence badges + citations (left) ↔ cited source claims with quote/page/section (right); accept/flag per sentence; coverage banner; HTML/PDF export links. |
-| [`app/lib/api.ts`](frontend/app/lib/api.ts) | Typed API client + response types mirroring the backend read models. |
-| [`app/layout.tsx`](frontend/app/layout.tsx) | Root HTML layout + page metadata. |
-| [`app/globals.css`](frontend/app/globals.css) | Tailwind directives + base body styles. |
-| [`next.config.mjs`](frontend/next.config.mjs) | `output: "standalone"` for a small runtime image. |
-| [`Dockerfile`](frontend/Dockerfile) | Multi-stage: deps → build → minimal `node` runtime serving `server.js`. |
+| [`app/page.tsx`](frontend/app/page.tsx) | The review dashboard: 3-step flow — **upload** a PDF → poll ingestion (determinate **progress bar** with stage + %) → **generate** (type + language; indeterminate bar) → **review**. State-aware step headings. |
+| [`app/components/EvidenceReview.tsx`](frontend/app/components/EvidenceReview.tsx) | Side-by-side review: sentences with verdict/confidence badges + citations (left) ↔ evidence (right): claim quote **plus the real source page rendered as PNG with the cited region highlighted**; accept/flag; coverage banner; HTML/PDF export. |
+| [`app/components/PipelineProgress.tsx`](frontend/app/components/PipelineProgress.tsx) | Determinate ingestion progress (stage label + %); page/chunk/claim stat tiles when done. |
+| [`app/components/brand-mark.tsx`](frontend/app/components/brand-mark.tsx) | University of Debrecen logo (`/ud-logo.svg`) with a shield fallback. |
+| [`app/components/theme-toggle.tsx`](frontend/app/components/theme-toggle.tsx), [`icons.tsx`](frontend/app/components/icons.tsx), [`ui/`](frontend/app/components/ui/) | Dark-mode toggle, hand-rolled SVG icons, CVA primitives (Button/Card/VerdictBadge). |
+| [`app/lib/api.ts`](frontend/app/lib/api.ts) | Typed API client + `pageImageUrl()`; types mirror the backend read models. |
+| [`app/layout.tsx`](frontend/app/layout.tsx) / [`globals.css`](frontend/app/globals.css) | Fonts + header + no-flash theme; editorial tokens + light/dark. |
+| [`Dockerfile`](frontend/Dockerfile) | Multi-stage (`node:22-alpine`, pnpm pinned): deps → build → standalone runtime. |
 
 > Data layer is vanilla `fetch` + polling (not React Query/Zod, a documented
-> deviation); accept/edit/flag is client-side only (no persistence endpoint yet).
+> deviation); accept/flag is client-side only (no persistence endpoint yet).
 
 **API base URL:** the browser reads `NEXT_PUBLIC_API_BASE` (defaults to
 `http://localhost:8000`). In production the frontend and API share one origin
@@ -524,7 +539,7 @@ flowchart LR
 | Reranker (bge-reranker); eval gold set + MLflow A/B | **Not started** (rest of Phase 1) |
 | **Claim-bound generation + TrustLayer (numeric, NLI, judge, coverage)** | **Implemented & verified** (Phase 2a+2b) |
 | **5 output types + HTML/PDF rendering (evidence trail + attribution)** | **Implemented & verified** (Phase 3) |
-| **Review dashboard (upload → generate → review-with-highlights → export)** | **Built; builds+type-checks** (Phase 4; live browser walkthrough pending stack) |
+| **Review dashboard + editorial UI, progress %, real-PDF source highlight** | **Implemented & verified live** (Phase 4 + polish pass) |
 | Pairwise-NLI consistency check; thresholds tuning → MLflow | **Deferred** (Phase 5 harness) |
 | Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
 

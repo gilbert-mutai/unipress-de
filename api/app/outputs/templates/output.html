@@ -23,6 +23,14 @@
                 padding:.6rem .8rem; font-family:system-ui,sans-serif; font-size:.78rem; color:#9a3412; }
     footer { margin-top:2rem; padding-top:1rem; border-top:1px solid #ddd;
              font-family:system-ui,sans-serif; font-size:.72rem; color:#555; }
+    table.scenes { width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:.82rem; }
+    table.scenes th { text-align:left; text-transform:uppercase; letter-spacing:.05em; font-size:.62rem;
+                      color:#888; border-bottom:1px solid #ddd; padding:.4rem .5rem; }
+    table.scenes td { border-bottom:1px solid #eee; padding:.55rem .5rem; vertical-align:top; }
+    table.scenes .tc { font-variant-numeric:tabular-nums; white-space:nowrap; color:#444; font-weight:600; }
+    table.scenes .scene { text-transform:uppercase; font-size:.6rem; letter-spacing:.05em; color:#999; }
+    table.scenes .os { color:#7a5a00; }
+    table.scenes .vis { color:#666; font-style:italic; }
   </style>
 </head>
 <body>
@@ -35,6 +43,27 @@
   </div>
   {% endif %}
 
+  {% if is_video %}
+  <table class="scenes">
+    <thead>
+      <tr><th>Time</th><th>Narration</th><th>On screen</th><th>Visual</th></tr>
+    </thead>
+    <tbody>
+      {% for s in scenes %}
+      <tr>
+        <td class="tc">{{ s.timecode or "" }}<div class="scene">{{ s.section or "" }}</div></td>
+        <td>
+          {{ s.text }}
+          {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence) }}{% endif %}</span>{% endif %}
+          {% if s.claim_ids %}<span class="cite">[{{ s.claim_ids|join(", ") }}]</span>{% endif %}
+        </td>
+        <td class="os">{{ s.on_screen or "" }}</td>
+        <td class="vis">{{ s.visual or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
   {% for section, sents in sections %}
   <div class="section">
     {% if section %}<div class="section-label">{{ section }}</div>{% endif %}
@@ -47,6 +76,7 @@
     {% endfor %}
   </div>
   {% endfor %}
+  {% endif %}
 
   <footer>
     <strong>Source:</strong> {{ attribution.title }}{% if attribution.authors %} — {{ attribution.authors|join(", ") }}{% endif %}.

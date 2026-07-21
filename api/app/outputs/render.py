@@ -35,6 +35,8 @@ def render_html(record: OutputRecord, source_filename: str) -> str:
         output_type=record.output_type,
         language=record.language,
         coverage=record.coverage,
+        is_video=record.output_type == "VIDEO_SCRIPT",
+        scenes=sorted(record.sentences, key=lambda s: s.order_index),
         sections=_sections(record),
         attribution=attribution_for(source_filename),
     )

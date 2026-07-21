@@ -8,6 +8,8 @@ export interface DocumentRead {
   id: string;
   filename: string;
   status: Status;
+  stage: string | null;
+  progress: number | null;
   page_count: number | null;
   chunk_count: number | null;
   claim_count: number | null;
@@ -23,6 +25,7 @@ export interface ClaimRead {
   page: number;
   section: string | null;
   quote: string;
+  bbox: number[] | null;
   importance: number;
   numeric: boolean;
 }
@@ -48,6 +51,9 @@ export interface SentenceRead {
   role: string;
   claim_ids: string[] | null;
   section: string | null;
+  timecode: string | null;
+  on_screen: string | null;
+  visual: string | null;
   verdict: Verdict | null;
   confidence: number | null;
   rationale: string | null;
@@ -122,4 +128,14 @@ export async function getOutput(outputId: string): Promise<OutputDetail> {
 
 export function renderUrl(outputId: string, format: "html" | "pdf"): string {
   return `${API_BASE}/documents/outputs/${outputId}/render?format=${format}`;
+}
+
+/** URL of a source page rendered to PNG, with an optional highlighted bbox. */
+export function pageImageUrl(
+  documentId: string,
+  page: number,
+  bbox?: number[] | null,
+): string {
+  const q = bbox && bbox.length === 4 ? `?bbox=${bbox.join(",")}` : "";
+  return `${API_BASE}/documents/${documentId}/pages/${page}.png${q}`;
 }

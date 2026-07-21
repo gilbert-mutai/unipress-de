@@ -61,6 +61,28 @@ def test_list_outputs_and_validation(client: TestClient) -> None:
     assert bad.status_code == 400
 
 
+def test_video_script_has_timed_scenes(client: TestClient) -> None:
+    doc_id = _ingest(client)
+    job = client.post(
+        f"/documents/{doc_id}/outputs", json={"output_type": "VIDEO_SCRIPT", "language": "en"}
+    )
+    output_id = job.json()["result"]
+    detail = client.get(f"/documents/outputs/{output_id}").json()
+
+    scenes = detail["sentences"]
+    assert scenes, "expected video scenes"
+    # Every scene carries a timecode + on-screen text; factual scenes cite claims.
+    assert all(s["timecode"] for s in scenes)
+    assert any(s["on_screen"] for s in scenes)
+    assert any(s["section"] == "hook" for s in scenes)
+    assert any(s["section"] == "cta" for s in scenes)
+
+    # The rendered HTML is a scene table with the timecodes.
+    html = client.get(f"/documents/outputs/{output_id}/render", params={"format": "html"}).text
+    assert 'table class="scenes"' in html
+    assert "0:00" in html
+
+
 def test_generate_requires_ingested_document(client: TestClient) -> None:
     # A document id that doesn't exist => 404.
     assert (

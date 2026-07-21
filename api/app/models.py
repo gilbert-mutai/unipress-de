@@ -40,6 +40,8 @@ class DocumentRead(BaseModel):
     id: str
     filename: str
     status: JobStatus
+    stage: str | None = None  # latest pipeline stage (parse/chunk/extract/embed/done)
+    progress: int | None = None  # 0–100, derived from the stage
     page_count: int | None = None
     chunk_count: int | None = None
     claim_count: int | None = None
@@ -110,6 +112,9 @@ class SentenceRead(BaseModel):
     role: str
     claim_ids: list[str] | None = None
     section: str | None = None
+    timecode: str | None = None
+    on_screen: str | None = None
+    visual: str | None = None
     verdict: str | None = None
     confidence: float | None = None
     rationale: str | None = None

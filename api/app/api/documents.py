@@ -30,13 +30,33 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 _MAX_BYTES = 30 * 1024 * 1024  # 30 MB upload cap
 _dispatch = CeleryTaskDispatch()
 
+# Ingestion stage → rough completion percentage (for the UI progress bar).
+_STAGE_PROGRESS = {"queued": 5, "parse": 25, "chunk": 45, "extract": 65, "embed": 85, "done": 100}
+
+
+def _with_progress(doc: Document, db: Session) -> DocumentRead:
+    """Build a DocumentRead with the latest ingestion stage + a 0–100 progress."""
+    job = db.scalars(
+        select(Job).where(Job.document_id == doc.id).order_by(Job.created_at.desc())
+    ).first()
+    stage = job.stage if job else None
+    if doc.status == "done":
+        progress = 100
+    elif doc.status == "failed":
+        progress = _STAGE_PROGRESS.get(stage or "", 0)
+    else:
+        progress = _STAGE_PROGRESS.get(stage or "queued", 5)
+    return DocumentRead.model_validate(doc).model_copy(
+        update={"stage": stage, "progress": progress}
+    )
+
 
 @router.post("", response_model=DocumentRead, status_code=201)
 async def upload_document(
     file: UploadFile,
     db: Session = Depends(get_db),
     storage: Storage = Depends(get_storage),
-) -> Document:
+) -> DocumentRead:
     """Store an uploaded PDF and enqueue the ingestion pipeline."""
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="only .pdf uploads are supported")
@@ -62,15 +82,15 @@ async def upload_document(
 
     _dispatch.enqueue_ingestion(job.id, doc.id)
     db.refresh(doc)
-    return doc
+    return _with_progress(doc, db)
 
 
 @router.get("/{document_id}", response_model=DocumentRead)
-def get_document(document_id: str, db: Session = Depends(get_db)) -> Document:
+def get_document(document_id: str, db: Session = Depends(get_db)) -> DocumentRead:
     doc = db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="document not found")
-    return doc
+    return _with_progress(doc, db)
 
 
 @router.get("/{document_id}/chunks", response_model=list[ChunkRead])
@@ -89,6 +109,31 @@ def get_claims(document_id: str, db: Session = Depends(get_db)) -> list[Claim]:
     return list(
         db.scalars(select(Claim).where(Claim.document_id == document_id).order_by(Claim.key))
     )
+
+
+@router.get("/{document_id}/pages/{page}.png")
+def get_page_image(
+    document_id: str, page: int, bbox: str | None = None, db: Session = Depends(get_db)
+) -> Response:
+    """Render a source PDF page as PNG, optionally highlighting a cited span (x0,y0,x1,y1)."""
+    if db.get(Document, document_id) is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    box: list[float] | None = None
+    if bbox:
+        try:
+            box = [float(v) for v in bbox.split(",")]
+            if len(box) != 4:
+                raise ValueError
+        except ValueError:
+            raise HTTPException(status_code=400, detail="bbox must be 'x0,y0,x1,y1'") from None
+
+    from app.ingestion.pageimage import render_page_png
+
+    try:
+        png = render_page_png(document_id, page, box)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "max-age=3600"})
 
 
 @router.post("/{document_id}/search", response_model=list[SearchHit])

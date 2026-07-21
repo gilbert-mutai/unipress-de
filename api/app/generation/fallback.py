@@ -14,6 +14,7 @@ from app.generation.models import (
     GeneratedOutput,
     GeneratedSentence,
     OutputSpec,
+    OutputType,
     SentenceRole,
 )
 
@@ -35,6 +36,11 @@ def _by_type(claims: list[ClaimInput], claim_type: str) -> list[ClaimInput]:
 def generate_fallback(
     spec: OutputSpec, claims: list[ClaimInput], language: str, title_hint: str
 ) -> GeneratedOutput:
+    if spec.output_type == OutputType.VIDEO_SCRIPT:
+        from app.generation.video import build_video_scenes
+
+        return build_video_scenes(claims, language, title_hint)
+
     eligible = [c for c in claims if c.claim_type in spec.claim_types]
     eligible.sort(key=lambda c: c.importance, reverse=True)
     eligible = eligible[: spec.max_claims]

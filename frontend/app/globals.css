@@ -2,10 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+@layer base {
+  :root {
+    --font-serif: "Fraunces Variable", Georgia, Cambria, serif;
+    --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+    --paper: 40 30% 97%;
+    --card: 0 0% 100%;
+    --ink: 30 12% 12%;
+    --muted: 30 8% 42%;
+    --line: 36 20% 87%;
+    --brand: 6 63% 42%;
+    --brand-fg: 40 30% 98%;
+  }
+
+  .dark {
+    --paper: 30 9% 8%;
+    --card: 30 8% 12%;
+    --ink: 40 22% 92%;
+    --muted: 36 10% 60%;
+    --line: 30 6% 20%;
+    --brand: 8 72% 60%;
+    --brand-fg: 30 12% 9%;
+  }
+
+  * {
+    border-color: hsl(var(--line));
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-feature-settings: "kern", "liga";
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Refined selection + focus */
+  ::selection {
+    background: hsl(var(--brand) / 0.18);
+  }
 }
 
-body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .skeleton {
+    @apply relative overflow-hidden bg-line/60;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(90deg, transparent, hsl(var(--card) / 0.6), transparent);
+    animation: shimmer 1.5s infinite;
+  }
 }

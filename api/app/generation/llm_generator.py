@@ -14,6 +14,7 @@ from app.generation.models import (
     GeneratedOutput,
     GeneratedSentence,
     OutputSpec,
+    OutputType,
     SentenceRole,
 )
 from app.llm.gateway import LiteLLMGateway
@@ -27,6 +28,17 @@ _SYSTEM = (
     "Mark hooks/connectives as role RHETORICAL or TRANSITION (no claim IDs). "
     'Return JSON: {"title":str,"sentences":[{"text":str,"role":'
     '"FACT|INTERPRETATION|RHETORICAL|TRANSITION","claim_ids":[str],"section":str}]}.'
+)
+
+_VIDEO_SYSTEM = (
+    "You are a science-video scriptwriter. Write a ≤60-second script as ordered SCENES "
+    "(hook, context, finding, meaning, cta) using ONLY the provided claims. For each scene "
+    "return: text (the spoken narration; factual scenes MUST cite claim IDs and add no new "
+    "facts/numbers), on_screen (a very short on-screen caption), visual (a visual suggestion), "
+    "timecode (e.g. '0:20–0:45'), section (the scene name), role "
+    "(FACT for narrated claims; RHETORICAL for the hook/cta). "
+    'Return JSON: {"title":str,"sentences":[{"text":str,"role":str,"claim_ids":[str],'
+    '"section":str,"timecode":str,"on_screen":str,"visual":str}]}.'
 )
 
 
@@ -56,6 +68,9 @@ def _parse(payload: dict, spec: OutputSpec, language: str, title_hint: str) -> G
                 role=role,
                 claim_ids=[str(c) for c in raw.get("claim_ids", [])],
                 section=raw.get("section"),
+                timecode=raw.get("timecode"),
+                on_screen=raw.get("on_screen"),
+                visual=raw.get("visual"),
             )
         )
     return GeneratedOutput(
@@ -76,8 +91,9 @@ def generate_llm(
     from app.core.settings import get_settings
 
     gateway = LiteLLMGateway(model=get_settings().llm_generation_model)
+    system = _VIDEO_SYSTEM if spec.output_type == OutputType.VIDEO_SCRIPT else _SYSTEM
     user = _prompt(spec, claims, language)
-    output = _parse(gateway.complete_json(_SYSTEM, user), spec, language, title_hint)
+    output = _parse(gateway.complete_json(system, user), spec, language, title_hint)
 
     if _needs_repair(output):  # one bounded self-repair pass
         log.info("generation.self_repair")
