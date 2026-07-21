@@ -99,7 +99,12 @@ services:
     build: ./api
     profiles: [core]
     command: ["celery", "-A", "app.tasks.celery_app.celery", "worker", "--loglevel=INFO", "--concurrency=2"]
-    environment: *app-env
+    environment:
+      <<: *app-env
+      # Prometheus multiprocess mode: prefork children share this dir; the main
+      # process serves the aggregate on :9100 (scraped as job "worker").
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus-multiproc
+      WORKER_METRICS_PORT: "9100"
     volumes:
       - storage:/data/storage
       - hfcache:/data/hf-cache
@@ -148,6 +153,14 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--web.enable-remote-write-receiver"
+    depends_on:
+      - pushgateway
+
+  # Batch jobs (eval/run_eval.py --push-metrics) push their gauges here; Prometheus
+  # scrapes the gateway so the live eval series (hallucination/faithfulness/…) persist.
+  pushgateway:
+    image: prom/pushgateway:v1.10.0
+    profiles: [observability]
 
   tempo:
     image: grafana/tempo:2.7.0

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.core.db import session_scope
 from app.core.logging import get_logger
+from app.core.metrics import timed_stage
 from app.core.settings import get_settings
 from app.db_models import Claim as ClaimRow
 from app.db_models import Document, OutputRecord, SentenceRecord
@@ -43,6 +44,7 @@ def _generate(
     return generate_fallback(spec, claims, language, title_hint)
 
 
+@timed_stage("generate")
 def generate_output(document_id: str, output_type: str, language: str) -> str:
     """Generate + verify + persist one output. Returns the output record id."""
     spec = get_spec(OutputType(output_type))

@@ -279,6 +279,21 @@ def _log_mlflow(report: dict[str, Any], uri: str, report_dir: Path) -> None:
     print(f"MLflow: logged to {uri} (experiment 'unipress-eval')")
 
 
+def _push_metrics(aggregate: dict[str, Any], gateway: str) -> None:
+    """Mirror the eval aggregate onto the Prometheus gauges and push to a Pushgateway."""
+    import os
+
+    from app.core.metrics import push_metrics, set_eval_metrics
+
+    url = gateway or os.environ.get("PUSHGATEWAY_URL") or "localhost:9091"
+    set_eval_metrics(aggregate)
+    try:
+        push_metrics(url)
+        print(f"Pushed eval metrics to Pushgateway {url}")
+    except Exception as exc:  # a down gateway must not fail the eval run
+        print(f"! Pushgateway {url} unreachable: {exc}", file=sys.stderr)
+
+
 def _write_report(report: dict[str, Any], label: str) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     name = f"{stamp}-{label}" if label else stamp
@@ -359,6 +374,9 @@ def main() -> int:
     ap.add_argument("--mlflow", action="store_true", help="log the run to MLflow")
     ap.add_argument("--mlflow-uri", default=None,
                     help="MLflow tracking URI (default: $MLFLOW_TRACKING_URI or file:./mlruns)")
+    ap.add_argument("--push-metrics", nargs="?", const="", default=None,
+                    help="push eval gauges to a Prometheus Pushgateway "
+                         "(default: $PUSHGATEWAY_URL or localhost:9091)")
     args = ap.parse_args()
 
     papers = _select_papers(args.papers, args.synthetic)
@@ -394,6 +412,8 @@ def main() -> int:
     out = _write_report(report, args.label)
     if args.mlflow:
         _log_mlflow(report, args.mlflow_uri or _default_mlflow_uri(), out)
+    if args.push_metrics is not None:
+        _push_metrics(agg, args.push_metrics)
     print(f"\nReport → {out.relative_to(REPO)}")
     print(f"Aggregate: halluc={agg['hallucination_rate']} faith={agg['faithfulness']} "
           f"quality={agg['quality_score']}")

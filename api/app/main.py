@@ -26,8 +26,13 @@ if settings.cors_origins:
         allow_headers=["*"],
     )
 
-# Prometheus /metrics.
+# Prometheus /metrics (default HTTP series + our app-specific families) plus the
+# live Celery queue-depth collector.
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
+
+from app.core.metrics import register_queue_collector  # noqa: E402
+
+register_queue_collector()
 
 # OTel FastAPI instrumentation (traces requests; connects to worker spans).
 try:
