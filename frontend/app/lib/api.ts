@@ -51,6 +51,9 @@ export interface SentenceRead {
   role: string;
   claim_ids: string[] | null;
   section: string | null;
+  timecode: string | null;
+  on_screen: string | null;
+  visual: string | null;
   verdict: Verdict | null;
   confidence: number | null;
   rationale: string | null;

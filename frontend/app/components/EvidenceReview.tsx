@@ -171,9 +171,29 @@ function SentenceCard({
         blocked && !selected && "border-red-200 dark:border-red-500/30",
       )}
     >
+      {(s.timecode || s.section) && (
+        <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
+          {s.timecode && <span className="tabular-nums text-brand">{s.timecode}</span>}
+          {s.section && <span>{s.section}</span>}
+        </div>
+      )}
       <p className={cn("text-[15px] leading-relaxed", flagged && "line-through opacity-50")}>
         {s.text}
       </p>
+      {(s.on_screen || s.visual) && (
+        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
+          {s.on_screen && (
+            <span>
+              <span className="font-medium text-ink">On-screen:</span> {s.on_screen}
+            </span>
+          )}
+          {s.visual && (
+            <span className="italic">
+              <span className="font-medium not-italic text-ink">Visual:</span> {s.visual}
+            </span>
+          )}
+        </div>
+      )}
       <div className="mt-2 flex items-center gap-2">
         {s.verdict && <VerdictBadge verdict={s.verdict} confidence={s.confidence} />}
         {s.claim_ids?.length ? (

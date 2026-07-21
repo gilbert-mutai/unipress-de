@@ -112,6 +112,9 @@ class SentenceRead(BaseModel):
     role: str
     claim_ids: list[str] | None = None
     section: str | None = None
+    timecode: str | None = None
+    on_screen: str | None = None
+    visual: str | None = None
     verdict: str | None = None
     confidence: float | None = None
     rationale: str | None = None
