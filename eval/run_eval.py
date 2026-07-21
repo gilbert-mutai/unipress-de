@@ -191,11 +191,57 @@ def evaluate(sentences: list[dict], claim_keys: set[str], output_type: str, lang
     }
 
 
+def run_adversarial(db: Any, doc_id: str, gold: dict | None) -> dict[str, Any] | None:
+    """Run each gold overclaim trap through the TrustLayer; report the caught rate.
+
+    Proves the system *catches* problems, not just passes clean text (docs/05 §2.3, §6).
+    Each trap's perturbed sentence is verified against its source claim; a trap is caught
+    when the verdict is UNSUPPORTED/CONTRADICTED.
+    """
+    traps = (gold or {}).get("adversarial") or []
+    if not traps:
+        return None
+
+    from sqlalchemy import select
+
+    from app.db_models import Claim
+    from app.generation.models import (
+        GeneratedOutput,
+        GeneratedSentence,
+        OutputType,
+        SentenceRole,
+    )
+    from app.trustlayer.verify import ClaimEvidence, verify_output
+
+    with db.session_scope() as s:
+        quotes = {c.key: c.quote for c in s.scalars(select(Claim).where(Claim.document_id == doc_id))}
+
+    results = []
+    for trap in traps:
+        key = trap["against_claim"]
+        if key not in quotes:
+            continue
+        output = GeneratedOutput(
+            output_type=OutputType.PRESS_RELEASE, language="en", title="adversarial",
+            sentences=[GeneratedSentence(text=trap["perturbed"], role=SentenceRole.FACT,
+                                         claim_ids=[key])],
+        )
+        verify_output(output, {key: ClaimEvidence(key=key, quote=quotes[key])})
+        verdict = output.sentences[0].verdict.value if output.sentences[0].verdict else "UNKNOWN"
+        results.append({"id": trap["id"], "expect": trap.get("expect"), "verdict": verdict})
+    return metrics.adversarial_caught(results)
+
+
 def _aggregate(rows: list[dict]) -> dict[str, Any]:
     """Mean of the headline metrics across all (paper × output) rows."""
     if not rows:
         return {}
     n = len(rows)
+    covs = [r["metrics"]["coverage"]["coverage"] for r in rows
+            if r["metrics"]["coverage"]["coverage"] is not None]
+    agg: dict[str, Any] = {}
+    if covs:
+        agg["key_fact_coverage"] = round(sum(covs) / len(covs), 4)
     return {
         "runs": n,
         "hallucination_rate": round(sum(r["metrics"]["hallucination_rate"] for r in rows) / n, 4),
@@ -204,6 +250,7 @@ def _aggregate(rows: list[dict]) -> dict[str, Any]:
         "evidence_link_validity": round(
             sum(r["metrics"]["evidence_link_validity"] for r in rows) / n, 4
         ),
+        **agg,
         "readability_band_hit_rate": round(
             sum(1 for r in rows if r["metrics"]["readability"]["band_hit"]) / n, 4
         ),
@@ -218,6 +265,8 @@ TARGETS = {  # docs/05 §6 MVP acceptance bars
     "hallucination_rate": ("<=", 0.05),
     "faithfulness": (">=", 0.90),
     "evidence_link_validity": (">=", 0.95),
+    "key_fact_coverage": (">=", 0.85),  # only checked when a gold set is present
+    "adversarial_caught_rate": (">=", 1.0),  # only checked when a gold set is present
 }
 
 
@@ -320,8 +369,11 @@ def _markdown(report: dict[str, Any]) -> str:
     ]
     checks = {c["metric"]: c for c in report["target_checks"]}
     for metric in ["hallucination_rate", "faithfulness", "claim_precision",
-                   "evidence_link_validity", "readability_band_hit_rate", "quality_score"]:
+                   "evidence_link_validity", "key_fact_coverage", "adversarial_caught_rate",
+                   "readability_band_hit_rate", "quality_score"]:
         val = agg.get(metric)
+        if val is None:  # e.g. gold-only metrics on a gold-less run
+            continue
         c = checks.get(metric)
         tgt = f"{c['op']} {c['target']}" if c else "—"
         met = "✅" if c and c["met"] else ("❌" if c else "—")
@@ -386,6 +438,7 @@ def main() -> int:
 
     db = _setup_infra()
     rows: list[dict[str, Any]] = []
+    adversarial: dict[str, Any] = {}
     for p in papers:
         print(f"→ {p['id']} ({p['language']})")
         doc_id = _ingest(db, p["filename"], p["data"])
@@ -397,8 +450,16 @@ def main() -> int:
                          "language": p["language"], "metrics": m})
             print(f"    {output_type:14s} halluc={m['hallucination_rate']:.3f} "
                   f"faith={m['faithfulness']:.3f} quality={m['quality_score']}")
+        adv = run_adversarial(db, doc_id, gold)
+        if adv is not None:
+            adversarial[p["id"]] = adv
+            print(f"    adversarial    caught={adv['caught']}/{adv['total']} "
+                  f"({adv['caught_rate']:.0%})")
 
     agg = _aggregate(rows)
+    caught = [a["caught_rate"] for a in adversarial.values() if a.get("caught_rate") is not None]
+    if caught:
+        agg["adversarial_caught_rate"] = round(sum(caught) / len(caught), 4)
     checks = _target_check(agg)
     report = {
         "run_at": datetime.now(timezone.utc).isoformat(),
@@ -406,6 +467,7 @@ def main() -> int:
         "generator": "deterministic-fallback",
         "papers": [p["id"] for p in papers],
         "rows": rows,
+        "adversarial": adversarial,
         "aggregate": agg,
         "target_checks": checks,
     }

@@ -1,0 +1,37 @@
+# Frozen gold set — pap_smear_screening (docs/05 §2). Human-verified; do NOT tune against it.
+# Key facts are the must-not-miss findings (claim keys as emitted by extraction).
+# Adversarial traps are numeric overclaims each verified to be caught by the TrustLayer.
+paper_id: pap_smear_screening
+
+# The must-not-miss findings a good output must cover (coverage metric, docs/05 §3.2).
+key_fact_claim_keys:
+  - clm_002   # 12M cell predictions → 88.8% smear-level accuracy (headline)
+  - clm_052   # core result: 88.8% ± 7.3% accuracy, F1 88.1%, AUC 89.2%
+  - clm_056   # high sensitivity 96.6% → suitable for screening
+  - clm_051   # evaluated on the full set of 339 smears (10-fold CV)
+  - clm_012   # the contribution: a fully automated conventional-Pap-smear pipeline
+  - clm_003   # why it matters: feasibility/potential to support cervical screening
+
+# Overclaim traps (docs/05 §2.3): a perturbed sentence + the verdict the TrustLayer
+# must return. Each was validated as CONTRADICTED at authoring time.
+adversarial:
+  - id: adv_001                      # the canonical demo trap (docs/08 DoD headline)
+    against_claim: clm_052
+    perturbed: "The model achieved an average accuracy of 98.8% ± 7.3%, F1 score of 88.1% ± 8.1%, AUC of 89.2% ± 9.3%."
+    expect: CONTRADICTED
+  - id: adv_002                      # inflated sensitivity
+    against_claim: clm_056
+    perturbed: "The high sensitivity of 99.6% ± 2.3% makes the system particularly suitable for screening applications."
+    expect: CONTRADICTED
+  - id: adv_003                      # overstated evidence base (cohort size)
+    against_claim: clm_051
+    perturbed: "We evaluated the optimized LightGBM model using stratified 10-fold cross-validation on the full set of 639 malignant smears."
+    expect: CONTRADICTED
+  - id: adv_004                      # inflated prediction count
+    against_claim: clm_002
+    perturbed: "Over 30 million individual cell predictions were utilized, resulting in an average smear-level classification accuracy of 88.8%."
+    expect: CONTRADICTED
+  - id: adv_005                      # inflated model accuracy
+    against_claim: clm_048
+    perturbed: "LightGBM achieved the best overall performance, with an accuracy of 97.61%."
+    expect: CONTRADICTED
