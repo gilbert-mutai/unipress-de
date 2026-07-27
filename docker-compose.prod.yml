@@ -1,0 +1,44 @@
+# UniPress DE — production overlay: public entry via nginx + Certbot TLS.
+# Enable by pinning both files in .env (server only):
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+# The dev docker-compose.override.yml (host port publishing) is intentionally NOT used
+# in production — only nginx is public (80/443).
+
+services:
+  # Build the frontend for single-origin: browser calls go to /api (same host),
+  # not the dev localhost:8000. NEXT_PUBLIC_* is baked at build time.
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE: /api
+
+  nginx:
+    image: nginx:1.27-alpine
+    profiles: [core]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ops/nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    depends_on:
+      - api
+      - frontend
+
+  # One-shot cert issuance + renewal. Not in the `core` profile, so it never
+  # auto-starts; invoked explicitly:
+  #   issue:   docker compose --profile certbot run --rm certbot certonly ...
+  #   renew:   docker compose --profile certbot run --rm certbot renew
+  certbot:
+    image: certbot/certbot:latest
+    profiles: [certbot]
+    volumes:
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+volumes:
+  certbot-webroot:
+  letsencrypt:
