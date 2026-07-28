@@ -16,7 +16,7 @@ configure_logging(settings.log_level)
 setup_tracing(settings)
 log = get_logger("api")
 
-app = FastAPI(title="UniPress DE API", version="0.1.0")
+app = FastAPI(title="UniPress DE API", version="0.1.0", root_path=settings.root_path)
 
 if settings.cors_origins:
     app.add_middleware(

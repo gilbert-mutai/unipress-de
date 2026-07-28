@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # this stays empty; local dev needs the frontend origin allowed.
     cors_origins: list[str] = Field(default=["http://localhost:3000"])
 
+    # Mount prefix when the api is served behind a path-stripping proxy
+    # (production: nginx routes /api/* -> api:8000/*). FastAPI needs it to build
+    # correct absolute links — without it /api/docs asks for /openapi.json at the
+    # site root, which nginx hands to the frontend. Empty in local dev.
+    root_path: str = Field(default="")
+
     # LLM. Extraction defaults to the deterministic heuristic; the LLM path is
     # opt-in (requires BOTH the flag and a key) so no spend happens by accident.
     openai_api_key: str = Field(default="")

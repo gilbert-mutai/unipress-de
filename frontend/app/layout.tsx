@@ -4,11 +4,15 @@ import "@fontsource-variable/inter";
 import { BrandMark } from "./components/brand-mark";
 import { ThemeToggle } from "./components/theme-toggle";
 import "./globals.css";
+import { API_BASE } from "./lib/api";
 
 export const metadata: Metadata = {
-  title: "UniPress DE — Trustworthy science communication",
+  title: "UniPress DE",
   description:
     "Turn a research paper into bilingual, publication-ready communication — every claim linked to its source and audited for hallucination.",
+  // Tab icon: the same University of Debrecen mark the header shows, referenced
+  // from /public rather than copied to app/icon.svg so there is one logo file.
+  icons: { icon: "/ud-logo.svg" },
 };
 
 // Set the theme before paint to avoid a flash.
@@ -29,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             <div className="flex items-center gap-3">
               <a
-                href="http://localhost:8000/docs"
+                href={`${API_BASE}/docs`}
                 target="_blank"
                 rel="noreferrer"
                 className="hidden text-sm text-muted hover:text-ink sm:block"

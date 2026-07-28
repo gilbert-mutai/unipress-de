@@ -9,6 +9,20 @@ Generic AI tools generate fluent, confident text with no evidence trail, so a pr
 
 ---
 
+## Live demo
+
+The system runs on a public HTTPS host — a single origin behind nginx, so the app, the API and the dashboard all share one domain.
+
+| | URL |
+|---|---|
+| **The app** — upload → generate → review evidence → export | **<https://unipress.gilbertmutai.com/>** |
+| **Trust & Ops dashboard** — live eval + ops metrics (Grafana, read-only) | <https://unipress.gilbertmutai.com/grafana/d/unipress-overview> |
+| **API reference** — interactive Swagger UI | <https://unipress.gilbertmutai.com/api/docs> |
+| API reference — ReDoc · raw schema | [`/api/redoc`](https://unipress.gilbertmutai.com/api/redoc) · [`/api/openapi.json`](https://unipress.gilbertmutai.com/api/openapi.json) |
+| Health probes — liveness · readiness (checks the DB) | [`/api/health`](https://unipress.gilbertmutai.com/api/health) · [`/api/ready`](https://unipress.gilbertmutai.com/api/ready) |
+
+Every API route lives under `/api` (nginx strips the prefix before proxying). Only 80/443 are published — Prometheus, Flower, MLflow and Tempo stay on the internal Docker network and are reachable in local dev only (see [Quickstart](#quickstart)).
+
 ## Why it's different
 
 - **Evidence-linked claims** — every generated sentence traces back to a page / section / verbatim quote.
@@ -46,6 +60,18 @@ cp .env.example .env        # add your OpenAI key
 docker compose --profile core up
 # add --profile observability for the Grafana/OTel stack
 ```
+
+Locally the services publish their own ports (unlike production, where only nginx is exposed):
+
+| URL | Service |
+|---|---|
+| <http://localhost:3000> | Frontend |
+| <http://localhost:8000/docs> | API + Swagger UI |
+| <http://localhost:3001> | Grafana (`admin` / `$GRAFANA_ADMIN_PASSWORD`) — `observability` profile |
+| <http://localhost:9090> | Prometheus — `observability` profile |
+| <http://localhost:3200> | Tempo (traces) — `observability` profile |
+| <http://localhost:5555> | Flower (Celery queue inspector) |
+| <http://localhost:5000> | MLflow (eval runs) — `ml` profile |
 
 ## Documentation
 

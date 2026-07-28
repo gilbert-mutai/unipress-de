@@ -13,6 +13,14 @@ services:
       args:
         NEXT_PUBLIC_API_BASE: /api
 
+  # nginx strips the /api prefix before proxying, so the app is mounted at /api
+  # from the browser's point of view. FastAPI needs to know that to build correct
+  # absolute links — otherwise /api/docs requests the schema from /openapi.json
+  # at the site root, which nginx routes to the frontend (404).
+  api:
+    environment:
+      ROOT_PATH: /api
+
   # Serve Grafana under https://unipress.gilbertmutai.com/grafana (behind nginx TLS).
   # Anonymous access is downgraded to Viewer here so the public demo board is
   # read-only; the admin login (GF_SECURITY_ADMIN_PASSWORD) still works.
