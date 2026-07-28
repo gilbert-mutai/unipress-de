@@ -13,6 +13,15 @@ services:
       args:
         NEXT_PUBLIC_API_BASE: /api
 
+  # Serve Grafana under https://unipress.gilbertmutai.com/grafana (behind nginx TLS).
+  # Anonymous access is downgraded to Viewer here so the public demo board is
+  # read-only; the admin login (GF_SECURITY_ADMIN_PASSWORD) still works.
+  grafana:
+    environment:
+      GF_SERVER_ROOT_URL: https://unipress.gilbertmutai.com/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+
   nginx:
     image: nginx:1.27-alpine
     profiles: [core]
