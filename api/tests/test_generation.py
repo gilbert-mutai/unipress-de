@@ -61,6 +61,41 @@ def test_list_outputs_and_validation(client: TestClient) -> None:
     assert bad.status_code == 400
 
 
+def test_repeat_request_reuses_the_existing_output(client: TestClient) -> None:
+    """Demo safety: a second request for the same (type, language) must not regenerate."""
+    doc_id = _ingest(client)
+    body = {"output_type": "PRESS_RELEASE", "language": "en"}
+
+    first = client.post(f"/documents/{doc_id}/outputs", json=body).json()
+    generated_id = first["result"]
+
+    # Make a further generation impossible: if the endpoint were to enqueue
+    # again, this would raise rather than quietly produce a second output.
+    from app.adapters import stubs
+
+    def _boom(*a: object, **k: object) -> str:
+        raise AssertionError("regenerated instead of reusing the existing output")
+
+    original = stubs.CeleryTaskDispatch.enqueue_generation
+    stubs.CeleryTaskDispatch.enqueue_generation = _boom  # type: ignore[method-assign]
+    try:
+        second = client.post(f"/documents/{doc_id}/outputs", json=body).json()
+    finally:
+        stubs.CeleryTaskDispatch.enqueue_generation = original  # type: ignore[method-assign]
+
+    assert second["status"] == "done"
+    assert second["stage"] == "cached"
+    assert second["result"] == generated_id
+
+    # Still exactly one output for the document, not two.
+    assert len(client.get(f"/documents/{doc_id}/outputs").json()) == 1
+
+    # refresh=true bypasses the reuse and generates again.
+    third = client.post(f"/documents/{doc_id}/outputs", json={**body, "refresh": True}).json()
+    assert third["result"] != generated_id
+    assert len(client.get(f"/documents/{doc_id}/outputs").json()) == 2
+
+
 def test_video_script_has_timed_scenes(client: TestClient) -> None:
     doc_id = _ingest(client)
     job = client.post(

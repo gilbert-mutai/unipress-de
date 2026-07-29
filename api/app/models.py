@@ -97,6 +97,9 @@ class SearchHit(BaseModel):
 class GenerateRequest(BaseModel):
     output_type: str = Field(default="PRESS_RELEASE")
     language: str = Field(default="en", pattern="^(en|hu)$")
+    # Reuse an existing output for this (document, type, language) when one
+    # exists — the demo-safety path. Set true to force a new generation.
+    refresh: bool = Field(default=False)
 
 
 class SentenceRead(BaseModel):
