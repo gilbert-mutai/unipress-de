@@ -73,6 +73,17 @@ docker compose run --rm migrate
 echo "→ Starting / refreshing services"
 docker compose up -d --remove-orphans
 
+# Recreating api/frontend gives them new container IPs. nginx resolves upstream
+# names when it loads its config, so without a reload it keeps proxying to the
+# old address and every /api/* request 502s — which is exactly what happened on
+# the first scripted deploy. A reload re-resolves them with no dropped
+# connections. (The config also re-resolves per request now; this covers the
+# case where that is not yet deployed.)
+if docker compose ps --services 2>/dev/null | grep -qx nginx; then
+    echo "→ Reloading nginx (re-resolve upstream container IPs)"
+    docker compose exec -T nginx nginx -s reload
+fi
+
 echo "→ Waiting for the API to report healthy"
 healthy=0
 for _ in $(seq 1 45); do

@@ -33,19 +33,89 @@ Every API route lives under `/api` (nginx strips the prefix before proxying). On
 
 ## How it works
 
+Nothing is written from the paper directly. The paper first becomes a store of **quote-anchored claims**, generation is then *bound* to those claims, and every generated sentence is independently checked against the exact quote it cites. Provenance is established before a single word is written, and re-verified after.
+
 ```mermaid
 flowchart LR
-    P[Paper] --> PARSE[Parse + spans]
-    PARSE --> EX[Claim extraction]
-    EX --> QG{Quote found<br/>in source?}
-    QG -->|no| DROP[Reject claim]
-    QG -->|yes| CS[(Claim store)]
-    PARSE --> EMB[Chunk + embed] --> VS[(Vector store)]
-    CS & VS --> GEN[Claim-bound generation]
-    GEN --> TL[TrustLayer verify]
-    TL --> SCORE[Verdict + confidence]
-    SCORE --> REV[Human review] --> OUT[Bilingual output]
+    subgraph IN["① Ingest — establish provenance"]
+        direction TB
+        PDF[["PDF upload"]] --> PARSE["<b>Parse</b><br/>PyMuPDF · text + page/char spans + bbox"]
+        PARSE --> CHUNK["<b>Chunk</b><br/>~900 chars, section-aware"]
+        CHUNK --> EX["<b>Extract claims</b><br/>heuristic rules or gpt-4o-mini"]
+        EX --> GUARD{"<b>Quote guardrail</b><br/>is the quote verbatim<br/>in the source?"}
+        GUARD -->|"no"| DROP["Claim rejected"]
+        GUARD -->|"yes"| CS[("<b>Claim store</b><br/>quote + span + type")]
+        CHUNK --> EMBED["<b>Embed</b><br/>multilingual-e5-small"]
+        EMBED --> VS[("Vector store<br/>Chroma")]
+    end
+
+    subgraph GENB["② Generate — bound to claims"]
+        direction TB
+        SPEC["Output spec<br/>press release · article · social<br/>exec summary · video script"] --> GEN
+        LANG["Language<br/>EN / HU"] --> GEN
+        GEN["<b>Claim-bound generation</b><br/>gpt-4o · every sentence cites claim IDs<br/>and carries a role"]
+    end
+
+    subgraph TL["③ TrustLayer — verify per sentence"]
+        direction TB
+        NUM["<b>1 · Numeric check</b><br/>do the numbers match the quote?"] --> NLI
+        NLI["<b>2 · Tier-1 entailment</b><br/>mDeBERTa XNLI, runs locally"] --> GATE{"entailment<br/>clearly high?"}
+        GATE -->|"no / has numbers"| JUDGE["<b>3 · Tier-2 judge</b><br/>gpt-4o-mini + written rationale"]
+        GATE -->|"yes"| SCORE
+        JUDGE --> SCORE["<b>4 · Confidence</b><br/>0.4·entail + 0.4·judge + 0.2·overlap<br/>− numeric penalty"]
+        SCORE --> VERDICT{"threshold"}
+    end
+
+    CS --> GEN
+    GEN --> NUM
+    VERDICT -->|"≥ 0.70"| SUP["SUPPORTED"]
+    VERDICT -->|"≥ 0.45"| INT["INTERPRETATION"]
+    VERDICT -->|"< 0.45"| UNS["UNSUPPORTED — flagged"]
+    VERDICT -->|"number wrong /<br/>source disagrees"| CON["CONTRADICTED — blocked"]
+
+    SUP & INT & UNS & CON --> REVIEW["<b>④ Human review</b><br/>evidence trail · source highlight<br/>accept / edit / flag"]
+    VS -.->|"evidence lookup<br/>+ semantic search"| REVIEW
+    REVIEW --> EXPORT[["Bilingual export<br/>HTML / PDF with attribution"]]
+
+    style GUARD fill:#054434,color:#fff
+    style CS fill:#054434,color:#fff
+    style GEN fill:#054434,color:#fff
+    style UNS fill:#fbab2c,color:#000
+    style CON fill:#fbab2c,color:#000
 ```
+
+### The stages in detail
+
+**① Ingest — turn a paper into verifiable claims**
+
+| Stage | What happens | Why it matters |
+|---|---|---|
+| **Parse** | PyMuPDF extracts text block by block, keeping each block's page number, character offsets and bounding box. | Those coordinates are what later let the UI highlight the exact sentence inside the original PDF. Without spans there is no visual evidence trail. |
+| **Chunk** | Blocks are grouped into ~900-character chunks, with a running section label (Abstract, Methods, …) and the offsets carried through. | Small enough for an extractor to read closely, large enough to keep a claim's context intact. |
+| **Extract claims** | Each chunk yields candidate claims, typed as `EXPLICIT_FACT`, `QUANTITATIVE`, `FINDING`, `METHOD`, `LIMITATION` or `BACKGROUND`. Deterministic rules by default; `gpt-4o-mini` when `LLM_EXTRACTION=true`. | The paper stops being prose and becomes a set of discrete, individually checkable facts. |
+| **Quote guardrail** | Every candidate must have its quote located **verbatim** in the parsed source. Anything that can't be located is discarded. | This is the load-bearing step: it means every claim in the store is *already proven* to exist in the paper, before generation ever runs. |
+| **Embed** | Chunks are embedded with `multilingual-e5-small` (Hungarian + English) into Chroma, with page/section/offset metadata. | Powers semantic search and evidence lookup. Note that generation does **not** read from here — see below. |
+
+**② Generate — write from claims, not from the paper**
+
+The generator receives the claim store, an output spec (one of five types) and a target language. It must produce sentences that **cite claim IDs**, and it tags each with a role: `FACT` (asserts something, must cite), `INTERPRETATION` (a reasonable inference), `RHETORICAL` (a hook — carries no factual load) or `TRANSITION`.
+
+This is deliberately **not** classic RAG. Retrieval-augmented generation fetches top-k chunks and lets the model write freely over them, which leaves nothing structurally tying an output sentence to a specific source span. Binding to claims gives per-sentence provenance — the property the whole product depends on.
+
+**③ TrustLayer — check every sentence against its own citation**
+
+Verification is per sentence, and the premise is only the quotes of the claims *that sentence cites*:
+
+1. **Numeric check** — a number in the sentence that the quote doesn't corroborate is a hard fail (`CONTRADICTED`), because a wrong figure is the most damaging error a press release can make.
+2. **Tier-1 entailment** — mDeBERTa XNLI scores entail / neutral / contradict, locally and free.
+3. **Tier-2 judge** — `gpt-4o-mini` runs when entailment isn't clearly high (< 0.85) or the sentence contains numbers, returning a supported-fraction *and a written rationale*. It exists because NLI answers a narrow question — "is this *strictly* entailed?" — and returns *neutral* for faithful paraphrases that add framing. The judge restores that nuance and produces the human-readable reason a reviewer sees.
+4. **Confidence** — `0.4·entail + 0.4·judge + 0.2·quote_overlap`, minus a numeric penalty, thresholded into the verdict.
+
+A sentence citing nothing, or citing a claim that isn't in the store, is `UNSUPPORTED` at confidence 0 — no benefit of the doubt.
+
+**④ Human review — the reviewer is the last gate**
+
+The dashboard shows each sentence with its role, verdict, confidence and cited quote, plus the highlighted region of the original PDF. Nothing is presented as automatically publishable: the reviewer accepts, edits or flags, then exports bilingual HTML/PDF with attribution.
 
 ## Tech stack (summary)
 
