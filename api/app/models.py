@@ -15,11 +15,6 @@ class JobStatus(StrEnum):
     failed = "failed"
 
 
-class JobCreate(BaseModel):
-    # Placeholder input for the skeleton; becomes an uploaded document in Phase 1.
-    input_text: str = Field(default="hello unipress", max_length=10_000)
-
-
 class JobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

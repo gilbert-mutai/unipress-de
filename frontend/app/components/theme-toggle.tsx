@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Moon, Sun } from "./icons";
 import { Button } from "./ui/button";
 
-export function ThemeToggle() {
+export function ThemeToggle({ onHeader = false }: { onHeader?: boolean }) {
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -23,7 +23,12 @@ export function ThemeToggle() {
   };
 
   return (
-    <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+    <Button
+      variant={onHeader ? "onHeader" : "ghost"}
+      size="icon"
+      onClick={toggle}
+      aria-label="Toggle theme"
+    >
       {dark ? <Moon /> : <Sun />}
     </Button>
   );

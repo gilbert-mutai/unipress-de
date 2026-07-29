@@ -42,14 +42,6 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
 
     from app.adapters import stubs
 
-    # Demo /jobs pipeline: mark done inline.
-    def _fake_pipeline(self: object, job_id: str) -> str:
-        with db.session_scope() as s:
-            job = s.get(Job, job_id)
-            if job is not None:
-                job.status, job.stage, job.result = "done", "done", "processed (test)"
-        return "test-task-id"
-
     # Real ingestion pipeline: run parse + chunk inline (no Celery/Redis).
     def _fake_ingest(self: object, job_id: str, document_id: str) -> str:
         from app.claims.service import extract_stage
@@ -82,7 +74,6 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
                 job.status, job.stage, job.result = "done", "done", output_id
         return "test-gen-id"
 
-    monkeypatch.setattr(stubs.CeleryTaskDispatch, "enqueue_pipeline", _fake_pipeline)
     monkeypatch.setattr(stubs.CeleryTaskDispatch, "enqueue_ingestion", _fake_ingest)
     monkeypatch.setattr(stubs.CeleryTaskDispatch, "enqueue_generation", _fake_generate)
 

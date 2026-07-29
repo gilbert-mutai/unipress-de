@@ -37,11 +37,6 @@ class LocalStorage:
 class CeleryTaskDispatch:
     """Adapter over the Celery pipeline entrypoints (imported lazily to avoid cycles)."""
 
-    def enqueue_pipeline(self, job_id: str) -> str:
-        from app.tasks.chains import start_pipeline
-
-        return start_pipeline(job_id)
-
     def enqueue_ingestion(self, job_id: str, document_id: str) -> str:
         from app.tasks.chains import start_ingestion
 

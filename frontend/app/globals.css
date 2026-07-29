@@ -3,26 +3,42 @@
 @tailwind utilities;
 
 @layer base {
+  /* Palette borrowed from the University of Debrecen identity (unideb.hu):
+     deep green #054434 as the primary, gold #fbab2c as the accent — both taken
+     from the official mark in /public/ud-logo.svg. Green carries large surfaces
+     (the header band); gold is used sparingly, as a rule or a badge, never as
+     text on light backgrounds (it fails WCAG AA there). */
   :root {
     --font-serif: "Fraunces Variable", Georgia, Cambria, serif;
     --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
-    --paper: 40 30% 97%;
+    --paper: 150 20% 98%;
     --card: 0 0% 100%;
-    --ink: 30 12% 12%;
-    --muted: 30 8% 42%;
-    --line: 36 20% 87%;
-    --brand: 6 63% 42%;
-    --brand-fg: 40 30% 98%;
+    --ink: 165 12% 14%;
+    --muted: 160 8% 40%;
+    --line: 155 14% 87%;
+    --brand: 165 87% 14%; /* #054434 — 11.6:1 on white */
+    --brand-fg: 150 30% 98%;
+    --accent: 37 96% 58%; /* #fbab2c */
+    --accent-fg: 165 45% 12%; /* dark green text on gold — 8.9:1 */
+    /* The header band stays deep green in both themes, as on unideb.hu. */
+    --header: 165 87% 13%;
+    --header-fg: 150 25% 97%;
   }
 
   .dark {
-    --paper: 30 9% 8%;
-    --card: 30 8% 12%;
-    --ink: 40 22% 92%;
-    --muted: 36 10% 60%;
-    --line: 30 6% 20%;
-    --brand: 8 72% 60%;
-    --brand-fg: 30 12% 9%;
+    --paper: 168 24% 7%;
+    --card: 166 18% 11%;
+    --ink: 150 14% 92%;
+    --muted: 155 10% 62%;
+    --line: 165 12% 20%;
+    /* #054434 is unreadable on a dark ground, so the primary lightens while
+       keeping the same hue; the gold barely moves. */
+    --brand: 164 48% 58%;
+    --brand-fg: 168 40% 8%;
+    --accent: 40 92% 60%;
+    --accent-fg: 165 45% 10%;
+    --header: 166 60% 9%;
+    --header-fg: 150 20% 95%;
   }
 
   * {
@@ -51,6 +67,12 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  /* unideb.hu underscores each section heading with a short gold rule. */
+  .rule-accent::after {
+    content: "";
+    @apply mt-2 block h-[3px] w-12 rounded-full;
+    background: hsl(var(--accent));
   }
   .skeleton {
     @apply relative overflow-hidden bg-line/60;

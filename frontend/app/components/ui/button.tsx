@@ -9,8 +9,13 @@ const button = cva(
       variant: {
         primary: "bg-ink text-paper hover:bg-ink/90 shadow-sm",
         brand: "bg-brand text-brand-fg hover:bg-brand/90 shadow-sm",
+        // Gold CTA, echoing the "APPLY ONLINE" button on unideb.hu. Dark green
+        // text on gold rather than white, which would fail contrast.
+        accent: "bg-accent text-accent-fg hover:bg-accent/90 shadow-sm",
         outline: "border border-line bg-card hover:bg-line/40 text-ink",
         ghost: "hover:bg-line/50 text-ink",
+        // For controls sitting on the deep-green header band.
+        onHeader: "text-header-fg hover:bg-white/15 focus-visible:ring-header-fg/60",
       },
       size: {
         sm: "h-8 px-3 text-sm",

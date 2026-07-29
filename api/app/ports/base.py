@@ -46,8 +46,6 @@ class Storage(Protocol):
 class TaskDispatch(Protocol):
     """Async job dispatch. Graduation path: Celery (documented as swappable)."""
 
-    def enqueue_pipeline(self, job_id: str) -> str: ...
-
     def enqueue_ingestion(self, job_id: str, document_id: str) -> str: ...
 
     def enqueue_generation(

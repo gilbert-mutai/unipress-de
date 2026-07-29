@@ -1,29 +1,21 @@
-"""Jobs API: the thin enqueue + read surface (all heavy work lives in the worker)."""
+"""Jobs API: read-only progress for work enqueued elsewhere.
+
+Jobs are created by the pipelines that own them — ingestion (POST /documents)
+and generation (POST /documents/{id}/outputs). There is deliberately no public
+create route: the Phase 0 skeleton had one taking arbitrary `input_text`, which
+let anyone spend worker time on a job bound to no document.
+"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
 from app.db_models import Job
-from app.models import JobCreate, JobRead
+from app.models import JobRead
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-_dispatch = CeleryTaskDispatch()
-
-
-@router.post("", response_model=JobRead, status_code=201)
-def create_job(payload: JobCreate, db: Session = Depends(get_db)) -> Job:
-    """Create a job row and enqueue the pipeline. Returns immediately."""
-    job = Job(input_text=payload.input_text, status="pending", stage="queued")
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    _dispatch.enqueue_pipeline(job.id)
-    return job
 
 
 @router.get("/{job_id}", response_model=JobRead)

@@ -108,7 +108,7 @@ export default function Home() {
     <main className="mx-auto max-w-content px-6 pb-16">
       {/* Hero */}
       <section className="py-7">
-        <h1 className="mt-3 max-w-3xl font-serif text-3xl font-semibold leading-[1.1] text-balance sm:text-4xl">
+        <h1 className="rule-accent mt-3 max-w-3xl font-serif text-3xl font-semibold leading-[1.1] text-brand text-balance sm:text-4xl">
           Trustworthy, traceable science communication.
         </h1>
         <p className="mt-2 max-w-2xl text-muted">
@@ -195,7 +195,7 @@ export default function Home() {
                   ["hu", "Hungarian"],
                 ]}
               />
-              <Button variant="brand" onClick={generate} disabled={busy}>
+              <Button variant="accent" onClick={generate} disabled={busy}>
                 {busy ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                 {busy ? "Generating…" : "Generate"}
               </Button>
@@ -233,7 +233,7 @@ export default function Home() {
 function StepHeading({ n, title, hint }: { n: number; title: string; hint: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-paper">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-brand-fg">
         {n}
       </span>
       <div>

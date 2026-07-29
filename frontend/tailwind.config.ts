@@ -13,6 +13,10 @@ const config: Config = {
         line: "hsl(var(--line) / <alpha-value>)",
         brand: "hsl(var(--brand) / <alpha-value>)",
         "brand-fg": "hsl(var(--brand-fg) / <alpha-value>)",
+        accent: "hsl(var(--accent) / <alpha-value>)",
+        "accent-fg": "hsl(var(--accent-fg) / <alpha-value>)",
+        header: "hsl(var(--header) / <alpha-value>)",
+        "header-fg": "hsl(var(--header-fg) / <alpha-value>)",
       },
       fontFamily: {
         serif: ["var(--font-serif)", "Georgia", "Cambria", "serif"],
