@@ -183,6 +183,36 @@ def generate_output(
             status_code=400, detail=f"unsupported output_type: {payload.output_type}"
         ) from None
 
+    # Demo safety (docs/08 P6): an output already generated for this
+    # (document, type, language) is returned as an already-complete job, so the
+    # UI resolves it in one round trip with no model call. That removes live
+    # rate-limit and latency risk from the demo path — the durable outputs table
+    # *is* the cache, rather than a second copy in Redis that can disagree with
+    # it. `refresh=true` forces a fresh generation.
+    if not payload.refresh:
+        existing = db.scalars(
+            select(OutputRecord)
+            .where(
+                OutputRecord.document_id == document_id,
+                OutputRecord.output_type == payload.output_type,
+                OutputRecord.language == payload.language,
+                OutputRecord.status == "done",
+            )
+            .order_by(OutputRecord.created_at.desc())
+            .limit(1)
+        ).first()
+        if existing is not None:
+            job = Job(
+                document_id=document_id,
+                status="done",
+                stage="cached",
+                result=existing.id,
+            )
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+            return job
+
     job = Job(document_id=document_id, status="pending", stage="queued")
     db.add(job)
     db.commit()
