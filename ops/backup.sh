@@ -5,8 +5,7 @@
 #   ops/backup.sh                 # run a backup now
 #   BACKUP_DIR=/mnt/x ops/backup.sh
 #
-# Restore (Postgres): gunzip -c pg-STAMP.sql.gz | docker compose exec -T postgres \
-#   psql -U unipress -d unipress
+# Restore: ops/restore.sh --latest   (drops + reloads the DB, swaps the volumes)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."                     # repo root (compose file + .env live here)
@@ -26,6 +25,16 @@ docker run --rm -v "${PROJECT}_chromadata:/data:ro" -v "$BACKUP_DIR:/backup" alp
 echo "→ Uploaded-PDF storage snapshot"
 docker run --rm -v "${PROJECT}_storage:/data:ro" -v "$BACKUP_DIR:/backup" alpine \
     tar czf "/backup/storage-$STAMP.tar.gz" -C /data .
+
+# The eval history (MLflow runs + artifacts) is demo evidence, so it is backed up
+# too. Absent on hosts that never ran the `ml` profile — skip rather than fail.
+if docker volume inspect "${PROJECT}_mlflowdata" >/dev/null 2>&1; then
+    echo "→ MLflow tracking-store snapshot"
+    docker run --rm -v "${PROJECT}_mlflowdata:/data:ro" -v "$BACKUP_DIR:/backup" alpine \
+        tar czf "/backup/mlflow-$STAMP.tar.gz" -C /data .
+else
+    echo "→ MLflow volume absent — skipped"
+fi
 
 echo "→ Pruning backups older than ${RETAIN_DAYS} days"
 find "$BACKUP_DIR" -type f -name '*.gz' -mtime +"$RETAIN_DAYS" -delete
