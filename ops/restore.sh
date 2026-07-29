@@ -7,9 +7,17 @@
 #   ONLY=pg ops/restore.sh --latest        # subset: pg,chroma,storage,mlflow
 #   FORCE=1 ops/restore.sh --latest        # skip the confirmation prompt (cron/CI)
 #
-# DESTRUCTIVE. The live database is dropped and recreated and the selected volumes
-# are wiped before extraction. Writers (api, worker, flower) are stopped for the
-# duration and restarted at the end, so nothing writes mid-restore.
+#   ops/restore.sh --latest --rehearse     # NON-DESTRUCTIVE verification
+#
+# DESTRUCTIVE by default. The live database is dropped and recreated and the
+# selected volumes are wiped before extraction. Writers (api, worker, flower) are
+# stopped for the duration and restarted at the end, so nothing writes mid-restore.
+#
+# --rehearse is how you check a backup without downtime: it verifies every
+# archive's integrity, loads the dump into a scratch database, compares its row
+# counts against the live one, then drops the scratch database. Nothing live is
+# touched and no service stops. That is enough to know the backups restore —
+# run it on a schedule; keep the destructive path for an actual recovery.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."                     # repo root (compose file + .env live here)
@@ -48,6 +56,9 @@ case "${1:-}" in
         ;;
 esac
 
+REHEARSE=0
+for arg in "$@"; do [[ $arg == --rehearse ]] && REHEARSE=1; done
+
 echo "Restoring stamp $STAMP from $BACKUP_DIR"
 missing=0
 for name in pg chroma storage mlflow; do
@@ -63,6 +74,75 @@ for name in pg chroma storage mlflow; do
     fi
 done
 ((missing == 0)) || { echo "✗ the Postgres dump for this stamp is missing" >&2; exit 1; }
+
+# --- rehearsal: verify the snapshot without touching anything live ----------
+if ((REHEARSE)); then
+    SCRATCH="restore_rehearsal_$STAMP"
+    SCRATCH="${SCRATCH//-/_}" # a stamp's hyphens are not valid unquoted in an identifier
+    echo
+    echo "REHEARSAL — nothing live is modified, no service is stopped."
+
+    echo "→ Verifying archive integrity"
+    for name in chroma storage mlflow; do
+        f="$BACKUP_DIR/$name-$STAMP.tar.gz"
+        [[ -f $f ]] || continue
+        if tar tzf "$f" >/dev/null 2>&1; then
+            echo "  ✓ $name-$STAMP.tar.gz reads cleanly ($(tar tzf "$f" | wc -l) entries)"
+        else
+            echo "  ✗ $name-$STAMP.tar.gz is corrupt" >&2
+            exit 1
+        fi
+    done
+    if gunzip -t "$BACKUP_DIR/pg-$STAMP.sql.gz" 2>/dev/null; then
+        echo "  ✓ pg-$STAMP.sql.gz decompresses cleanly"
+    else
+        echo "  ✗ pg-$STAMP.sql.gz is corrupt" >&2
+        exit 1
+    fi
+
+    echo "→ Loading the dump into scratch database '$SCRATCH'"
+    docker compose exec -T postgres psql -U "$PGUSER_" -d postgres -v ON_ERROR_STOP=1 -q \
+        -c "DROP DATABASE IF EXISTS \"$SCRATCH\" WITH (FORCE);" \
+        -c "CREATE DATABASE \"$SCRATCH\" OWNER \"$PGUSER_\";"
+    gunzip -c "$BACKUP_DIR/pg-$STAMP.sql.gz" \
+        | docker compose exec -T postgres psql -U "$PGUSER_" -d "$SCRATCH" -v ON_ERROR_STOP=1 -q
+
+    echo "→ Comparing the restored copy against live"
+    printf '  %-18s %10s %10s\n' table restored live
+    rc=0
+    for t in documents chunks claims outputs output_sentences jobs; do
+        r="$(docker compose exec -T postgres psql -U "$PGUSER_" -d "$SCRATCH" -tAc \
+            "select count(*) from $t" 2>/dev/null | tr -d '\r' || echo ERR)"
+        l="$(docker compose exec -T postgres psql -U "$PGUSER_" -d "$PGDB_" -tAc \
+            "select count(*) from $t" 2>/dev/null | tr -d '\r' || echo ERR)"
+        printf '  %-18s %10s %10s' "$t" "$r" "$l"
+        if [[ $r == ERR ]]; then
+            echo "   ✗ missing in the restored copy"
+            rc=1
+        elif [[ $r == "$l" ]]; then
+            echo "   ✓"
+        else
+            # Live has moved on since the snapshot; that is expected, not a fault.
+            echo "   · differs (live changed since $STAMP)"
+        fi
+    done
+    rev="$(docker compose exec -T postgres psql -U "$PGUSER_" -d "$SCRATCH" -tAc \
+        "select version_num from alembic_version" 2>/dev/null | tr -d '\r')"
+    echo "  alembic revision in the restored copy: ${rev:-MISSING}"
+    [[ -n $rev ]] || rc=1
+
+    if [[ -z ${KEEP_SCRATCH:-} ]]; then
+        echo "→ Dropping scratch database"
+        docker compose exec -T postgres psql -U "$PGUSER_" -d postgres -q \
+            -c "DROP DATABASE IF EXISTS \"$SCRATCH\" WITH (FORCE);"
+    else
+        echo "→ Keeping '$SCRATCH' (KEEP_SCRATCH set)"
+    fi
+
+    ((rc == 0)) || { echo "✗ rehearsal FAILED"; exit 1; }
+    echo "✓ rehearsal passed — stamp $STAMP restores cleanly"
+    exit 0
+fi
 
 if [[ -z ${FORCE:-} ]]; then
     echo
