@@ -27,8 +27,14 @@ _THOUSANDS = re.compile(r"\d{1,3}(?:,\d{3})+")  # 1,234 / 12,345,678
 _DECIMAL_COMMA = re.compile(r"\d+,\d{1,3}")  # 88,8 / 0,05
 
 # Small spelled-out numbers, EN + HU. Papers write "nine networks" while a
-# generated sentence — especially a translated one — writes "9". Both sides are
-# normalised so the two forms compare equal.
+# generated sentence — especially a translated one — writes "9", so the *premise*
+# is read with these expanded to digits, widening what counts as corroboration.
+#
+# Deliberately one-directional. Normalising the sentence too invents numeric
+# obligations out of ordinary prose: Hungarian "egy" is the indefinite article as
+# much as it is "one", so "Egy új tanulmány szerint…" ("A new study…") became
+# "1 új tanulmány" and was hard-failed for a number nobody claimed. The sentence's
+# *numerals* must be corroborated; the premise is read as generously as possible.
 _WORD_NUMBERS = {
     # English
     "zero": 0,
@@ -124,7 +130,7 @@ def numbers(text: str) -> list[float]:
 
 def _all_variants(text: str) -> list[list[float]]:
     """Per-token candidate readings, for tolerant comparison."""
-    return [v for m in _NUMBER.findall(_with_word_numbers(text)) if (v := _variants(m))]
+    return [v for m in _NUMBER.findall(text) if (v := _variants(m))]
 
 
 def _matches(values: list[float], candidates: list[float]) -> bool:
@@ -138,5 +144,6 @@ def numeric_mismatch(sentence: str, premise: str) -> bool:
     sentence_nums = _all_variants(sentence)
     if not sentence_nums:
         return False
-    premise_nums = [v for variants in _all_variants(premise) for v in variants]
+    # Only the premise gets spelled-out numbers expanded — see _WORD_NUMBERS.
+    premise_nums = [v for variants in _all_variants(_with_word_numbers(premise)) for v in variants]
     return any(not _matches(values, premise_nums) for values in sentence_nums)
