@@ -22,6 +22,31 @@ def test_numeric_mismatch_catches_wrong_number() -> None:
     assert numeric_mismatch("A qualitative improvement.", PREMISE) is False  # no numbers
 
 
+def test_numeric_mismatch_reads_hungarian_decimal_commas() -> None:
+    """HU writes 88,8 where the EN source writes 88.8 — that is not a mismatch.
+
+    Reading every comma as a thousands separator turned 88,8 into 888 and made
+    the TrustLayer return CONTRADICTED for correct Hungarian sentences.
+    """
+    assert numeric_mismatch("A pontosság 88,8% volt.", PREMISE) is False
+    assert numeric_mismatch("339 kenetet vizsgáltak.", PREMISE) is False
+    # …and a genuinely wrong Hungarian number is still caught.
+    assert numeric_mismatch("A pontosság 98,8% volt.", PREMISE) is True
+
+
+def test_numeric_mismatch_still_reads_english_thousands_separators() -> None:
+    premise = "The ensemble produced 12,000,000 cell predictions across 1,234 slides."
+    assert numeric_mismatch("It made 12,000,000 predictions.", premise) is False
+    assert numeric_mismatch("Across 1,234 slides.", premise) is False
+    assert numeric_mismatch("Across 9,999 slides.", premise) is True
+
+
+def test_numeric_mismatch_handles_mixed_separators() -> None:
+    """Both conventions for one thousand and a bit."""
+    assert numeric_mismatch("Total was 1.234,5 units.", "Total was 1,234.5 units.") is False
+    assert numeric_mismatch("Total was 9.999,5 units.", "Total was 1,234.5 units.") is True
+
+
 def _output(*sentences: GeneratedSentence) -> GeneratedOutput:
     return GeneratedOutput(
         output_type=OutputType.PRESS_RELEASE, language="en", title="t", sentences=list(sentences)
