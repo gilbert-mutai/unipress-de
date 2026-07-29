@@ -8,6 +8,8 @@ claim. Every sentence is still verified downstream by the TrustLayer.
 
 from __future__ import annotations
 
+import re
+
 from app.core.logging import get_logger
 from app.generation.fallback import ClaimInput
 from app.generation.models import (
@@ -52,10 +54,31 @@ def _prompt(spec: OutputSpec, claims: list[ClaimInput], language: str) -> str:
     )
 
 
+# Claim ids belong in the claim_ids field, not in the prose — but the model
+# occasionally trails them into the sentence itself ("…consistency (clm_003,
+# clm_005)."), most often when writing Hungarian. Left in, they are published
+# text a reviewer would see, and the numeric check reads the digits out of
+# "clm_003" as if they were quantities. Strip them defensively; claim_ids is
+# still the authoritative citation.
+_INLINE_CITATION = re.compile(
+    r"""[\s]*[(\[]\s*                 # opening bracket
+        clm[_-]?\d+                   # first id
+        (?:\s*[,;/]\s*clm[_-]?\d+)*   # any further ids
+        \s*[)\]]""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _strip_inline_citations(text: str) -> str:
+    cleaned = _INLINE_CITATION.sub("", text)
+    # A trailing citation often sat before the full stop: "…text (clm_003)."
+    return re.sub(r"\s+([.!?])", r"\1", cleaned).strip()
+
+
 def _parse(payload: dict, spec: OutputSpec, language: str, title_hint: str) -> GeneratedOutput:
     sentences: list[GeneratedSentence] = []
     for raw in payload.get("sentences", []):
-        text = (raw.get("text") or "").strip()
+        text = _strip_inline_citations((raw.get("text") or "").strip())
         if not text:
             continue
         try:

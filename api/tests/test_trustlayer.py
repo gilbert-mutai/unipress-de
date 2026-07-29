@@ -41,6 +41,24 @@ def test_numeric_mismatch_still_reads_english_thousands_separators() -> None:
     assert numeric_mismatch("Across 9,999 slides.", premise) is True
 
 
+def test_numeric_mismatch_ignores_digits_inside_identifiers() -> None:
+    """A leaked "(clm_003, clm_005)" citation is not a numeric claim.
+
+    Reading the digits out of clm_003 hard-failed correct sentences to
+    CONTRADICTED — observed in production on the Hungarian video script.
+    """
+    assert numeric_mismatch("It raises capacity (clm_003, clm_005).", PREMISE) is False
+    assert numeric_mismatch("88,8%-os pontosság (clm_002, clm_024).", PREMISE) is False
+
+
+def test_numeric_mismatch_reads_spelled_out_numbers() -> None:
+    """The paper writes "nine networks"; a translated sentence writes "9"."""
+    premise = "The system used an ensemble of nine deep neural networks."
+    assert numeric_mismatch("A 9 modellből álló háló.", premise) is False
+    assert numeric_mismatch("An ensemble of 9 networks.", premise) is False
+    assert numeric_mismatch("An ensemble of 42 networks.", premise) is True
+
+
 def test_numeric_mismatch_handles_mixed_separators() -> None:
     """Both conventions for one thousand and a bit."""
     assert numeric_mismatch("Total was 1.234,5 units.", "Total was 1,234.5 units.") is False
