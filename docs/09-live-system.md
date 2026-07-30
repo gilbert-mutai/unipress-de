@@ -151,6 +151,21 @@ Two things `deploy.sh` does that are easy to get wrong by hand: it runs `alembic
 
 Backups are the nightly `pg_dump` plus Chroma, uploaded-PDF and MLflow volume snapshots in `/opt/unipress-backups`, pruned after 7 days. `--rehearse` is the one to run regularly: it proves the snapshot restores without stopping anything.
 
+### SSH
+
+Key-only: `ops/sshd/00-unipress-hardening.conf` is deployed to `/etc/ssh/sshd_config.d/` and disables password and keyboard-interactive authentication. Verified — the server advertises `publickey` alone.
+
+The `00-` prefix is not cosmetic. **sshd honours the first occurrence of a keyword**, and Ubuntu's `50-cloud-init.conf` sets `PasswordAuthentication yes`, so a drop-in named `99-*` is read *after* it and has no effect. Check the resolved configuration, never the file, after any change:
+
+```bash
+sshd -t                                      # validate BEFORE reloading
+sshd -T | grep -i passwordauthentication     # what is actually in force
+systemctl reload ssh
+ssh -o BatchMode=yes root@<host> true         # confirm key login still works
+```
+
+Root login remains enabled deliberately: it is currently the only route in, and the key is installed. Disabling it (`ops/harden.sh`, which also configures ufw) requires creating a keyed non-root sudo user first — otherwise it removes all access.
+
 ## 8. What is measured
 
 - **Grafana** ([`/grafana/d/unipress-overview`](https://unipress.gilbertmutai.com/grafana/d/unipress-overview)) — 16 panels: per-stage latency and throughput, Celery queue depth, LLM token rate and cost, API p95, plus **live eval metrics** as first-class series.
