@@ -1,8 +1,15 @@
-# UniPress DE — MVP Development Plan
+# UniPress DE — Build Record
+
+_The phased development plan, kept with its per-phase outcome log._
 
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`07-tech-stack.md`](07-tech-stack.md)
 > The build sequenced as milestones against the **25 September 2026** demo deadline, on the production skeleton from `07`.
 > Anchor date: 19 July 2026 · ~10 working weeks · Solo build · Possible AI Sprint Final: 9–10 October 2026.
+
+> **Build record — history, not a plan.** The phase sequence with an outcome log per
+> phase: what was built, what was verified, and what was deviated from or deferred.
+> Development is complete; nothing here is outstanding work. For the system as it runs
+> today see [`09-live-system.md`](09-live-system.md).
 
 ---
 
@@ -22,15 +29,15 @@ Effort is stated in **focused engineering-days** (a solo builder's realistic ~5-
 
 ## 1. Timeline at a glance
 
-| # | Phase | Weeks | Dates (2026) | Focus | Cumulative days |
-|---|---|---|---|---|---|
-| **P0** ✅ | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 |
-| **P1** 🚧 | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG · *1a ingestion done* | 15 |
-| **P2** ✅ | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 |
-| **P3** ✅ | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 |
-| **P4** ✅ | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 |
-| **P5** ✅ | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board, gold set | 47 |
-| **P6** | Deploy, harden & demo | W9–W10 | Sep 14 – Sep 25 | Angani VM, TLS, rehearse, **freeze** | 52 |
+| # | Phase | Weeks | Dates (2026) | Focus | Cumulative days | Status |
+|---|---|---|---|---|---|---|
+| **P0** | Foundation & walking skeleton | W1 | Jul 20 – Jul 26 | Compose up, CI, ports, one round-trip | 5 | Complete |
+| **P1** | Ingestion, claim store & retrieval | W2–W3 | Jul 27 – Aug 9 | PDF → verified claims → RAG | 15 | Complete |
+| **P2** | Generation + TrustLayer (**trust core**) | W4–W5 | Aug 10 – Aug 23 | Claim-bound gen, NLI + judge + scoring | 25 | Complete |
+| **P3** | Outputs & bilingual rendering | W6 | Aug 24 – Aug 30 | 5 output types × HU/EN, evidence trail | 30 | Complete |
+| **P4** | Review dashboard (**the product**) | W7–W8 | Aug 31 – Sep 13 | Upload → review-with-highlights → export | 40 | Complete |
+| **P5** | Evaluation, MLflow & observability | W8–W9 | Sep 7 – Sep 20 | Harness, eval-gate, Grafana board, gold set | 47 | Complete |
+| **P6** | Deploy, harden & demo | W9–W10 | Sep 14 – Sep 25 | Angani VM, TLS, rehearse, **freeze** | 52 | Partial |
 
 > P5 overlaps P4 by design — the gold set and metrics accrue while the frontend is built. **Feature freeze: Mon 22 Sep**; Tue 23 – Fri 25 is rehearsal + contingency buffer.
 
@@ -82,7 +89,7 @@ gantt
 
 **Risks:** dependency/version friction (torch CPU wheel, WeasyPrint system libs) → pin versions, bake into images early. Docker resource pressure on the dev machine → use profiles to run lean locally.
 
-**Status — ✅ delivered (19 Jul 2026).** Repo scaffolded (`api/`, `worker/`, `frontend/`, `ops/`); Compose profiles (`core | observability | ml | local-llm`) validate; api+worker share one image (ML split deferred, see `worker/README.md`); Alembic `0001_initial` creates the `jobs` table; the four ports ship with stub adapters; `/health` + `/ready` live; the demo Celery chain (`ingest → parse → embed → verify → finalize`) runs. **Verified live:** `docker compose --profile core up` healthy, a job round-trips API → Celery → Postgres to `done`, worker logs each stage as structured JSON. Backend CI-clean (ruff, mypy, 6 pytest); frontend type-checks + builds. **Deferred to a follow-up within P1:** confirming the api→worker trace lands in Tempo (instrumentation is wired), and the dev-convenience code bind-mount/hot-reload.
+**Status: delivered (19 Jul 2026).** Repo scaffolded (`api/`, `worker/`, `frontend/`, `ops/`); Compose profiles (`core | observability | ml | local-llm`) validate; api+worker share one image (ML split deferred, see `worker/README.md`); Alembic `0001_initial` creates the `jobs` table; the four ports ship with stub adapters; `/health` + `/ready` live; the demo Celery chain (`ingest → parse → embed → verify → finalize`) runs. **Verified live:** `docker compose --profile core up` healthy, a job round-trips API → Celery → Postgres to `done`, worker logs each stage as structured JSON. Backend CI-clean (ruff, mypy, 6 pytest); frontend type-checks + builds. **Deferred to a follow-up within P1:** confirming the api→worker trace lands in Tempo (instrumentation is wired), and the dev-convenience code bind-mount/hot-reload.
 
 ---
 
@@ -107,7 +114,7 @@ gantt
 
 **Risks:** multi-column / table extraction quality on the papers → GROBID is the pre-scoped fallback (`07` §2.1), introduced only against a measured need. HU tokenization/accents → verified explicitly on the curriculum in DoD.
 
-**Status — 🚧 in progress. Sub-phases 1a (ingestion) + 1b (claim extraction) ✅ delivered (19 Jul 2026).**
+**Status: delivered.** 1a (ingestion) and 1b (claim extraction) landed 19 Jul 2026; 1c (retrieval) below. The P1 tail — gold set and retrieval A/B — closed under P5 workstreams B and C.
 - **1a — Built:** PyMuPDF parser (text + bbox blocks, image-only detection → warning); structure-aware chunker (page-bounded chunks, best-effort section detection, exact `SourceSpan` provenance); `Document`/`Chunk` tables + Alembic `0002`; `Storage` port wired for uploads (shared api/worker volume); `POST /documents` + `GET /documents/{id}` + `/chunks`; Celery chain `parse → chunk → finalize`. **Verified:** all 6 sample PDFs parse cleanly (page counts match manifest; HU accents preserved; **0 chunk-provenance failures**); end-to-end EN 10p/94 chunks, HU 9p/19 chunks.
 - **1b — Built:** the **quote-verification guardrail** (docs/03 §2.3 — exact + whitespace-flexible span location; rejects any quote not literally in source); deterministic **heuristic extractor** (sentence split, cue-based typing into QUANTITATIVE/FINDING/METHOD/LIMITATION, numeric flag, importance ranking, dedup) as the no-key default; **LiteLLM `LLMGateway`** adapter + schema-constrained **LLM extractor** behind the same guardrail, **opt-in** via `llm_extraction` flag + key (default off, so zero spend by default); `Claim` table + Alembic `0003`; `extract` Celery stage (`parse → chunk → extract → finalize`); `GET /documents/{id}/claims`. **Verified:** 0 claim-provenance failures on all 4 papers; end-to-end pap-smear paper → **76 claims** with correct types + spans (e.g. QUANTITATIVE "over 12 million individual cell predictions", p1). 20 pytest, ruff + mypy clean.
 - **Known gap:** heuristic extractor yields 0 claims on the HU curricula (English cues, low claim density) — the LLM path or HU cues address this later; curricula drive programme-promotion outputs, not claim-dense press releases.
@@ -136,7 +143,7 @@ gantt
 
 **Risks:** local ML memory footprint (BGE-M3 + DeBERTa + reranker ≈ 5–6 GB) → models loaded **once in the worker** per `07` §7; validate the memory budget on the target VM spec early. Judge cost/latency → T1 gates most sentences off the paid judge; Redis memoization on repeated claims.
 
-**Status — 🚧 in progress. Sub-phase 2a (claim-bound generation + deterministic TrustLayer core) ✅ delivered (20 Jul 2026).**
+**Status: delivered.** 2a (claim-bound generation and the deterministic TrustLayer core) landed 20 Jul 2026; 2b (real NLI, LLM judge, coverage) below completes the trust core.
 - **Built:** generation contracts (`OutputType`, `SentenceRole`, `Verdict`, `GeneratedSentence`/`Output`, `OutputSpec`); per-type specs (press release + exec summary, docs/04); **claim-bound generator** — deterministic fallback (renders verified claims, every factual sentence cites its claim key; no key needed) **+ opt-in LiteLLM path** (`llm_generation` flag + key, schema-constrained, one self-repair pass); **TrustLayer deterministic core** — numeric-mismatch check (2% rounding tolerance), quote-overlap, lexical-entailment proxy, confidence blend + hard numeric penalty (docs/03 §5.4), per-sentence verdict (SUPPORTED/INTERPRETATION/RHETORICAL/UNSUPPORTED/CONTRADICTED) with export threshold — all behind `Entailment` port; `outputs`/`output_sentences` tables + Alembic `0004`; generation Celery task; `POST /documents/{id}/outputs`, `GET /documents/{id}/outputs`, `GET /documents/outputs/{id}`.
 - **Verified:** 25 pytest (ruff+mypy clean). TrustLayer unit tests prove the headline DoD deterministically — **`88.8% → 98.8%` numeric perturbation → CONTRADICTED**; a claim-less factual sentence → UNSUPPORTED; framing → RHETORICAL. End-to-end via TestClient (real DB): upload → extract → generate press release → every factual sentence carries a claim citation + verdict + confidence.
 - **2b — Built (20 Jul 2026):** real **NLI** behind the `Entailment` port — `classify()` now returns 3-way scores (entail/neutral/contradict); `DebertaNLI` (mDeBERTa-XNLI, multilingual HU+EN, ~560MB) selected via `nli_backend="nli"`, lexical proxy still the default. **Tier-2 LLM judge** (`gpt-4o-mini`, opt-in via `llm_judge`) with supported-fraction + rationale; `verify.py` rewritten with proper gating (numeric mismatch → CONTRADICTED; NLI contradiction > cutoff → CONTRADICTED; judge only for numeric or not-clearly-entailed sentences) and the judge term wired into the confidence blend. **Document-level coverage** (`coverage.py`) — omitted high-importance claims + dropped-limitation warnings, stored on `outputs.coverage` (Alembic `0005`), surfaced in `OutputDetail`.
@@ -163,7 +170,7 @@ gantt
 
 **Risks:** HU generation quality vs. EN → per-language verification catches drift; the HU curriculum is the native test bed. Output sprawl → all five are the *same* `OutputSpec` abstraction over one claim store; deferred formats (newsletter/FAQ/slides) stay out (`04` §deferred).
 
-**Status — ✅ delivered (20 Jul 2026).**
+**Status: delivered (20 Jul 2026).**
 - **Built:** all **five `OutputSpec`s** (press release, article, social, exec summary, video script) over the one claim store; **Jinja2 HTML rendering** (`app/outputs/`) with the inline **evidence trail** (per-sentence verdict badge + confidence + claim citations), **coverage warnings**, and an **attribution footer** (title/authors/venue/DOI/license) sourced from [`data/manifest.yaml`](../data/manifest.yaml); **WeasyPrint PDF** export (lazy import; Dockerfile ships pango/cairo libs; 501 if unavailable); `GET /documents/outputs/{id}/render?format=html|pdf`. **Bilingual:** `language` (en|hu) flows through generation → the LLM path regenerates per language (not translation); TrustLayer uses multilingual mDeBERTa so HU verification works.
 - **Verified:** 33 pytest (ruff+mypy clean); HTML render carries evidence trail + verdict badges; attribution footer pulls real provenance from the manifest (e.g. Pap-smear paper → authors + DOI + CC BY 4.0).
 - **Honest gaps:** the **deterministic fallback generator renders in the source language** (real HU output needs the LLM path — mechanism wired, not run to save credits); PDF export verified by code path but needs the container's system libs (works in the image, not bare local); per-type structure (esp. video-script scenes) is best-shaped by the LLM path.
@@ -188,10 +195,10 @@ gantt
 
 **Risks:** frontend is the largest single chunk of UI work for a backend-leaning solo builder → keep it purposeful (review UX only, no auth/settings sprawl — auth is a production graduation, `02` §8); reuse the highlight primitive across all output types.
 
-**Status — ✅ delivered (20 Jul 2026).**
+**Status: delivered (20 Jul 2026).**
 - **Built:** the Next.js review dashboard (`frontend/`). Typed API client (`app/lib/api.ts`) over the real endpoints. Three-step flow in `app/page.tsx`: **1) upload** a PDF → **poll ingestion** status (parsing→chunking→claims→embeddings) with page/chunk/claim counts; **2) generate** — pick output type (all 5) + language (EN/HU); poll the generation job → load the output; **3) review** — `EvidenceReview` component: left = generated sentences with **verdict badges + confidence + claim citations** (blocked UNSUPPORTED/CONTRADICTED ring-flagged), right = **source evidence** side-by-side (click a sentence → its cited claims' quotes with page/section), plus **accept/flag** per sentence, a **coverage-warning banner**, and **export** links (HTML / PDF via the render endpoint).
 - **Verified live (browser + full stack):** the entire journey — upload → progress → generate → review → export — confirmed on the running `docker compose` stack after fixing the blockers found there (Docker credential helper; Chroma client/server version match; frontend `node:22` + pinned pnpm).
-- **Product-polish pass (⭐ delivered same day):** editorial design system (Fraunces + Inter, warm palette, light/dark, CVA primitives); **University of Debrecen logo** in the header; **real ingestion progress** — the api reports `stage`+`progress` (0–100) on the document and the UI shows a determinate bar + stage label + %; **indeterminate "Generating…" bar**; state-aware step headings; plain-language copy; and the **killer feature** — a new `GET /documents/{id}/pages/{n}.png` endpoint (PyMuPDF) that renders the real source page with the cited span highlighted, shown side-by-side in the review panel.
+- **Product-polish pass (delivered same day):** editorial design system (Fraunces + Inter, warm palette, light/dark, CVA primitives); **University of Debrecen logo** in the header; **real ingestion progress** — the api reports `stage`+`progress` (0–100) on the document and the UI shows a determinate bar + stage label + %; **indeterminate "Generating…" bar**; state-aware step headings; plain-language copy; and the **killer feature** — a new `GET /documents/{id}/pages/{n}.png` endpoint (PyMuPDF) that renders the real source page with the cited span highlighted, shown side-by-side in the review panel.
 - **Deviations/gaps (recorded):** vanilla `fetch` + polling instead of React Query/Zod; **accept/flag is client-side only** (no persistence endpoint yet); direct api origin in dev (single-origin via nginx is Phase 6).
 
 ---
@@ -215,12 +222,12 @@ gantt
 
 **Risks:** eval targets not met by MVP → the harness *is* the tuning loop (threshold/weight tuning from P2 continues here); scope the gold set to the sample corpus first, external papers optional (`06` §7).
 
-**Status — ✅ delivered (21 Jul 2026). All five workstreams A (harness) + B (gold set) + C (MLflow) + D (CI eval-gate) + E (Grafana/observability) complete.**
+**Status: delivered (21 Jul 2026). All five workstreams A (harness) + B (gold set) + C (MLflow) + D (CI eval-gate) + E (Grafana/observability) complete.**
 - **A — Built:** `eval/` — `metrics.py` (pure, unit-tested docs/05 metrics: hallucination rate, faithfulness, claim precision, evidence-link validity, Flesch/HU readability vs per-type floors, gold coverage + adversarial-caught hooks, trust-weighted quality score §5) and `run_eval.py`, which runs the **real pipeline end-to-end in-process** (parse → chunk → extract → embed → generate → TrustLayer) on the sample papers with throwaway service-free infra (in-memory SQLite, hashing embedder, in-memory store) — no key, no Docker, reproducible. Writes timestamped JSON + Markdown to `eval/reports/` (gitignored); checks the §6 MVP target bars; `--fail-on-target-miss` gives CI the eval-gate hook. `textstat` added as an `eval` dependency group. `eval/gold/<paper_id>.yaml` schema documented (`eval/README.md`) — gold-based metrics activate the moment a frozen file lands.
 - **A — Verified:** 11 metric unit tests green (ruff clean); full baseline run = **4 research papers × 5 outputs = 20 runs**, aggregate faithfulness 1.0 / hallucination 0.0 (fallback is grounded by construction), quality 93.1. Honest finding surfaced: **readability band-hit only 0.45** — verbatim academic claims are often too dense to clear the accessible-reading floor, which quantifies why the LLM rewrite path matters.
 - **C — Built:** **MLflow tracking** — `run_eval.py --mlflow` logs every run as a parent MLflow run (config params + aggregate metrics + target-bar pass/fail + the JSON/MD report artifacts) with a **nested run per (paper × output)** for clean comparison; defaults to a local `file:./mlruns` store (no server needed), or point `MLFLOW_TRACKING_URI`/`--mlflow-uri` at the compose `mlflow` service. New `eval/retrieval_ab.py` runs the deferred **retrieval A/B** (P1 tail): embeds a document under each backend arm (hashing baseline, or e5-small vs BGE-M3 on the VM), scores probe queries with hit@k + MRR, and logs each arm to MLflow (experiment `unipress-retrieval-ab`) — turning the default-embedder choice into a versioned number. `mlflow` added as its own dependency group, **pinned `<3` to match the compose server image (v2.19.0)** so the shared backend store isn't corrupted by a client/server skew (cf. the Chroma pin). **Verified:** both paths log locally (mlflow 2.22.5); eval + api suites green.
 - **E — Built:** the **observability layer + Grafana board**. New `app/core/metrics.py` defines the app-specific Prometheus families — per-stage latency + throughput (`unipress_stage_seconds`/`_total`, the five pipeline stages decorated with `@timed_stage`), LLM token + estimated-cost accounting wired into the LiteLLM gateway (`unipress_llm_tokens_total`/`unipress_llm_cost_usd_total`), a live Celery **queue-depth** collector (reads Redis LLEN per scrape), and the **live eval gauges** (`unipress_eval_metric`). Worker exposes its metrics via Prometheus **multiprocess mode** on `:9100` (`app/tasks/metrics_server.py`, Celery signals; compose sets `PROMETHEUS_MULTIPROC_DIR`); a **Pushgateway** service carries the batch eval metrics (`run_eval.py --push-metrics`). Prometheus scrapes api + worker + pushgateway; a provisioned **Grafana dashboard** (`ops/grafana/provisioning/dashboards/unipress.json`, 16 panels: trust/eval stats + eval-over-time, stage latency/throughput/queue, LLM token-rate/cost, API p95/rate) renders it all. **Verified:** the app series appear on `/metrics` after a pipeline run (new test); dashboard JSON + provisioning YAML + `docker compose config` all valid; 37 api + 13 eval tests, ruff/format/mypy clean. **Live Grafana render pending a full-stack run** (same Docker-credential blocker noted in Phase 4 — verify when the stack is next up).
-- **B — Built:** the **gold + adversarial set** (docs/05 §2, also closes the P1 tail). `eval/bootstrap_gold.py` ingests each paper, dumps every extracted claim, proposes key facts, and auto-generates numeric overclaim traps — each **self-validated** by running it through the TrustLayer (only caught traps are proposed); candidates (`.candidate.yaml`, gitignored — they embed full claim text) are human-verified before freezing. The headline demo paper is frozen at `eval/gold/pap_smear_screening.yaml` — 6 human-curated must-not-miss key facts + 5 validated overclaim traps including the canonical **88.8%→98.8%** (docs §6). `run_eval.py` now executes the traps (`run_adversarial`) and folds **key-fact coverage** + **adversarial-caught rate** into the aggregate + §6 target bars. **Verified:** on pap_smear the harness reports **adversarial caught 5/5 (100%)** ✅ (meets §6) and an honest **key-fact coverage 0.20** ❌ — the deterministic fallback selects claims by its own ranking, quantifying the gap the LLM rewrite path closes. The gold-less CI synthetic gate is unaffected (gold-only targets simply don't apply). The other three papers remain local `.candidate.yaml` for later verification.
+- **B — Built:** the **gold + adversarial set** (docs/05 §2, also closes the P1 tail). `eval/bootstrap_gold.py` ingests each paper, dumps every extracted claim, proposes key facts, and auto-generates numeric overclaim traps — each **self-validated** by running it through the TrustLayer (only caught traps are proposed); candidates (`.candidate.yaml`, gitignored — they embed full claim text) are human-verified before freezing. The headline demo paper is frozen at `eval/gold/pap_smear_screening.yaml` — 6 human-curated must-not-miss key facts + 5 validated overclaim traps including the canonical **88.8%→98.8%** (docs §6). `run_eval.py` now executes the traps (`run_adversarial`) and folds **key-fact coverage** + **adversarial-caught rate** into the aggregate + §6 target bars. **Verified:** on pap_smear the harness reports **adversarial caught 5/5 (100%)**  (meets §6) and an honest **key-fact coverage 0.20** (below target) — the deterministic fallback selects claims by its own ranking, quantifying the gap the LLM rewrite path closes. The gold-less CI synthetic gate is unaffected (gold-only targets simply don't apply). The other three papers remain local `.candidate.yaml` for later verification.
 
 ---
 
@@ -243,7 +250,7 @@ gantt
 
 **Risks:** deployment-day surprises → deploy the skeleton to the VM early (a smoke deploy in P0/P1 slack), so P6 is a redeploy, not a first deploy. Live-demo fragility → pre-generated outputs + cache are the safety net; the public URL de-risks "works on my laptop."
 
-**Status — 🟡 substantially delivered (30 Jul 2026); hosting, ops and demo safety done, docs + SSH hardening open.**
+**Status: substantially delivered (30 Jul 2026); hosting, ops and demo safety done, docs + SSH hardening open.**
 
 - **Hosting — done.** Angani VM (`Brainiac`, 8 vCPU / 15 GB / 97 GB) runs the profiled production topology: 14 containers, `.env` pinning `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` so the dev port-publishing override is never merged. Nginx + Certbot TLS on `unipress.gilbertmutai.com`; API under `/api` (prefix stripped), Grafana under `/grafana`. Externally **only 22/80/443 answer** — 8000/3000/3001/5555/9090/5000/9100 all refused. Grafana verified read-only for the public (anonymous cannot write dashboards or read admin settings; no default credentials work).
 - **Ops — done.** `ops/deploy.sh` is the scripted redeploy (`git pull --ff-only` → build → **explicit** `alembic upgrade head` → `up -d` → nginx reload → verify), with `--no-pull/--no-build/--force-rebuild`. Migrations run explicitly because compose is otherwise satisfied by an unchanged `migrate` image's previous exit, silently skipping a new revision. `ops/backup.sh` (nightly cron, `/opt/unipress-backups`) now also snapshots MLflow. `ops/restore.sh` restores pg + chroma + storage + mlflow, and **`--rehearse` verifies a snapshot with zero downtime** — archive integrity, load into a scratch database, per-table comparison against live, alembic revision check, scratch dropped.

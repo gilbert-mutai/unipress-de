@@ -3,6 +3,11 @@
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`02-architecture.md`](02-architecture.md)
 > The trust-critical path in detail: data contracts, extraction, generation binding, and the TrustLayer algorithm.
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 0. The core idea in one sentence

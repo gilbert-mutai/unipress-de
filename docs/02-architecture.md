@@ -3,6 +3,11 @@
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`01-project-definition.md`](01-project-definition.md)
 > Build mode: Solo · LLM strategy: Hybrid (OSS core + swappable hosted LLM) · Deploy: Docker Compose
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 0. Design principles
@@ -296,20 +301,20 @@ The competition build *is* the first slice of the production system — there is
 
 | Capability | Competition (built) | Production (graduation) |
 |---|:--:|:--:|
-| PDF parse + spans | ✅ | + OCR |
-| Claim extraction (quote-verified) | ✅ | ✅ |
-| RAG generation (claim-bound) | ✅ | ✅ |
-| TrustLayer (NLI + judge + score) | ✅ | fine-tuned NLI |
-| Evidence-linked review UI | ✅ | + auth/multi-tenant |
-| Outputs: press/article/social/exec/script | ✅ | ✅ |
-| Bilingual HU + EN | ✅ | + more languages |
-| Async job queue (Celery/Redis) | ✅ | autoscaling / KEDA |
-| Evaluation harness + MLflow | ✅ | eval as CD gate |
-| Observability (OTel/Prom/Tempo/Grafana) | ✅ | + Loki, alerting, SLOs |
-| CI/CD (lint/type/test/eval/build/deploy) | ✅ | + canary/rollback |
-| LLM via gateway (OpenAI + Ollama) | ✅ | + self-hosted vLLM |
-| Migrations (Alembic) | ✅ | CI-gated |
-| Video rendering | stretch | ✅ |
+| PDF parse + spans | Handled | + OCR |
+| Claim extraction (quote-verified) | Handled | |
+| RAG generation (claim-bound) | Handled | |
+| TrustLayer (NLI + judge + score) | Handled | fine-tuned NLI |
+| Evidence-linked review UI | Handled | + auth/multi-tenant |
+| Outputs: press/article/social/exec/script | Handled | |
+| Bilingual HU + EN | Handled | + more languages |
+| Async job queue (Celery/Redis) | Handled | autoscaling / KEDA |
+| Evaluation harness + MLflow | Handled | eval as CD gate |
+| Observability (OTel/Prom/Tempo/Grafana) | Handled | + Loki, alerting, SLOs |
+| CI/CD (lint/type/test/eval/build/deploy) | Handled | + canary/rollback |
+| LLM via gateway (OpenAI + Ollama) | Handled | + self-hosted vLLM |
+| Migrations (Alembic) | Handled | CI-gated |
+| Video rendering | stretch | Handled |
 | Deploy | Compose (profiles) on VM + Nginx/Certbot | K8s + Terraform |
 
 ---

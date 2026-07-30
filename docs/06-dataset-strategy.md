@@ -3,6 +3,11 @@
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`05-evaluation.md`](05-evaluation.md)
 > Which documents to use, how to stay legally clean, how to build the test set, and how to handle messy real-world PDFs.
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 0. Guiding rule
@@ -118,14 +123,14 @@ Hand-author 5–10 perturbations of real sentences (wrong number, dropped caveat
 
 | Challenge | Strategy | MVP? |
 |---|---|---|
-| **Multi-column PDFs** | Layout-aware parser (PyMuPDF/Docling) preserves reading order; validate on 3 test papers | ✅ |
-| **Tables** | Extract cells + coordinates; store table claims with cell-level spans; numeric verification compares exact cell values | ✅ (core tables) |
+| **Multi-column PDFs** | Layout-aware parser (PyMuPDF/Docling) preserves reading order; validate on 3 test papers | Handled |
+| **Tables** | Extract cells + coordinates; store table claims with cell-level spans; numeric verification compares exact cell values | Handled (core tables) |
 | **Figures/charts** | Extract caption + reference the figure region as a span; **no chart-data OCR** in MVP (cite the caption/nearby text) | Partial |
-| **Equations** | Keep as text/LaTeX where the parser gives it; not a claim source | ✅ (pass-through) |
+| **Equations** | Keep as text/LaTeX where the parser gives it; not a claim source | Pass-through |
 | **Scanned/image PDFs** | Detect image-only pages; **warn + skip** rather than silent failure; OCR deferred | Deferred |
-| **References/citations** | Parsed as `BACKGROUND`; not treated as the paper's own findings | ✅ |
-| **Encoding/Unicode (HU accents)** | Normalize UTF-8; test on Hungarian text early (á/é/ő/ű) | ✅ |
-| **Very long papers** | Section-aware chunking; extract per section; cap tokens per LLM call | ✅ |
+| **References/citations** | Parsed as `BACKGROUND`; not treated as the paper's own findings | Handled |
+| **Encoding/Unicode (HU accents)** | Normalize UTF-8; test on Hungarian text early (á/é/ő/ű) | Handled |
+| **Very long papers** | Section-aware chunking; extract per section; cap tokens per LLM call | Handled |
 
 ### 4.1 Conflicting information within a paper
 - Both claims stored with their spans. If a generated sentence uses one, the **consistency check** (pairwise NLI, `03` §5.5) flags tension; UI shows both sources. We **never silently pick one**.
