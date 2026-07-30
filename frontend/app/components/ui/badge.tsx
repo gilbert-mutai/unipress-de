@@ -9,6 +9,13 @@ const VERDICT: Record<string, string> = {
   CONTRADICTED: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300",
 };
 
+// Truncate rather than round, so a confidence never displays higher than it is.
+// Rounding put 0.445 on screen as "0.45" next to an UNSUPPORTED verdict, while the
+// INTERPRETATION threshold is 0.45 — making a correct verdict look like a bug.
+function floor2(value: number): string {
+  return (Math.floor(value * 100) / 100).toFixed(2);
+}
+
 export function VerdictBadge({
   verdict,
   confidence,
@@ -27,7 +34,7 @@ export function VerdictBadge({
       )}
     >
       {verdict}
-      {confidence != null && <span className="opacity-70">{confidence.toFixed(2)}</span>}
+      {confidence != null && <span className="opacity-70">{floor2(confidence)}</span>}
     </span>
   );
 }
