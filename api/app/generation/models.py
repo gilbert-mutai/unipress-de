@@ -58,6 +58,14 @@ class GeneratedOutput(BaseModel):
     language: Literal["en", "hu"]
     title: str
     sentences: list[GeneratedSentence]
+    # The headline is the most-read and most-quotable line in an output, so it is
+    # claim-bound and verified like any factual sentence. Leaving it unchecked let
+    # a simulation-only study be titled "Achieves 100% Success Rate" while the
+    # body sentences citing the same claims scored only INTERPRETATION.
+    title_claim_ids: list[str] = Field(default_factory=list)
+    title_verdict: Verdict | None = None
+    title_confidence: float | None = None
+    title_rationale: str | None = None
 
 
 class OutputSpec(BaseModel):

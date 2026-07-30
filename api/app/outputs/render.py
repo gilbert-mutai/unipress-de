@@ -32,6 +32,11 @@ def _sections(record: OutputRecord) -> list[tuple[str | None, list]]:
 def render_html(record: OutputRecord, source_filename: str) -> str:
     return _env.get_template("output.html").render(
         title=record.title,
+        # The exported artefact carries the headline's verdict too: a reader who only
+        # ever sees the PDF should know whether its title was verified.
+        title_verdict=record.title_verdict,
+        title_confidence=record.title_confidence,
+        title_claim_ids=record.title_claim_ids,
         output_type=record.output_type,
         language=record.language,
         coverage=record.coverage,

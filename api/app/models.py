@@ -126,6 +126,10 @@ class OutputSummary(BaseModel):
     output_type: str
     language: str
     title: str
+    title_claim_ids: list[str] | None = None
+    title_verdict: str | None = None
+    title_confidence: float | None = None
+    title_rationale: str | None = None
     status: JobStatus
     created_at: datetime
 

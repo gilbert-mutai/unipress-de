@@ -70,6 +70,38 @@ fi
 echo "→ alembic upgrade head"
 docker compose run --rm migrate
 
+# Assert the database actually reached the newest revision in the working tree.
+# `alembic upgrade head` inside a STALE migrate image exits 0 having done nothing —
+# its own "head" is the old one — and the freshly built api then writes to columns
+# that do not exist. That happened: a selective `build api worker frontend` left
+# migrate behind and broke generation in production. Comparing against the repo,
+# not against the container's opinion, is what catches it.
+expected="$(python3 - <<'PY'
+import pathlib, re
+revs = {}
+for f in pathlib.Path("api/alembic/versions").glob("*.py"):
+    t = f.read_text()
+    r = re.search(r'^revision: str = "([^"]+)"', t, re.M)
+    d = re.search(r'^down_revision: str \| None = (?:"([^"]+)"|None)', t, re.M)
+    if r:
+        revs[r.group(1)] = d.group(1) if d else None
+children = {v for v in revs.values() if v}
+heads = [r for r in revs if r not in children]
+print(heads[0] if len(heads) == 1 else "AMBIGUOUS")
+PY
+)"
+actual="$(docker compose exec -T postgres psql -U "${POSTGRES_USER:-unipress}" \
+    -d "${POSTGRES_DB:-unipress}" -tAc 'select version_num from alembic_version' 2>/dev/null | tr -d '\r')"
+if [[ $expected == AMBIGUOUS ]]; then
+    echo "! multiple alembic heads in the working tree — merge them before deploying" >&2
+elif [[ -n $expected && $actual != "$expected" ]]; then
+    echo "✗ database is at '$actual' but the repo's head is '$expected'." >&2
+    echo "  The migrate image is stale. Run: docker compose build migrate" >&2
+    exit 1
+else
+    echo "  schema at $actual (repo head)"
+fi
+
 echo "→ Starting / refreshing services"
 docker compose up -d --remove-orphans
 

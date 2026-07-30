@@ -67,9 +67,30 @@ export default function EvidenceReview({
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand">
             {output.output_type.replace("_", " ")} · {output.language.toUpperCase()}
           </div>
-          <h3 className="mb-4 font-serif text-2xl font-semibold leading-snug text-balance">
+          <h3 className="font-serif text-2xl font-semibold leading-snug text-balance">
             {output.title}
           </h3>
+          {/* The headline is verified like any factual sentence — it is the line most
+              likely to be quoted, so its verdict is shown alongside it. */}
+          {output.title_verdict && (
+            <div className="mb-4 mt-1.5 flex flex-wrap items-center gap-2">
+              <VerdictBadge
+                verdict={output.title_verdict}
+                confidence={output.title_confidence ?? undefined}
+              />
+              {output.title_claim_ids?.length ? (
+                <span className="font-mono text-[11px] text-brand">
+                  [{output.title_claim_ids.join(", ")}]
+                </span>
+              ) : (
+                <span className="text-[11px] text-muted">headline cites no claim</span>
+              )}
+              {output.title_rationale && (
+                <span className="text-[11px] text-muted">· {output.title_rationale}</span>
+              )}
+            </div>
+          )}
+          {!output.title_verdict && <div className="mb-4" />}
           <div className="space-y-2.5">
             {output.sentences.map((s) => (
               <SentenceCard

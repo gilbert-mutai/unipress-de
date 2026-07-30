@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -120,6 +120,11 @@ class OutputRecord(Base):
     output_type: Mapped[str] = mapped_column(String(20))
     language: Mapped[str] = mapped_column(String(8))
     title: Mapped[str] = mapped_column(Text, default="")
+    # The title is claim-bound and verified like a sentence (docs/03 §5).
+    title_claim_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    title_verdict: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    title_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    title_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     coverage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)

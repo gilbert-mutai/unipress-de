@@ -85,5 +85,8 @@ def generate_fallback(
         output_type=spec.output_type,
         language=language,
         title=title,
+        # The fallback lifts its headline verbatim from one claim, so that claim is
+        # the title's citation and the TrustLayer can verify it like any sentence.
+        title_claim_ids=[headline.key] if headline else [],
         sentences=sentences,
     )

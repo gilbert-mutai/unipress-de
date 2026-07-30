@@ -72,6 +72,10 @@ export interface OutputDetail {
   output_type: string;
   language: string;
   title: string;
+  title_claim_ids?: string[] | null;
+  title_verdict?: string | null;
+  title_confidence?: number | null;
+  title_rationale?: string | null;
   status: Status;
   coverage: Coverage | null;
   sentences: SentenceRead[];

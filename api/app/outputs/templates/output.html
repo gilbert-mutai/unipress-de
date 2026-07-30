@@ -18,6 +18,7 @@
     .INTERPRETATION { background:#fef9c3; color:#854d0e; }
     .UNSUPPORTED, .CONTRADICTED { background:#fee2e2; color:#991b1b; }
     .RHETORICAL { background:#f1f5f9; color:#475569; }
+    .titleverdict { margin: -.4rem 0 1rem; }
     .cite { font-family: system-ui, sans-serif; font-size:.62rem; color:#2563eb; margin-left:.25rem; }
     .warnings { background:#fff7ed; border:1px solid #fed7aa; border-radius:.5rem;
                 padding:.6rem .8rem; font-family:system-ui,sans-serif; font-size:.78rem; color:#9a3412; }
@@ -36,6 +37,12 @@
 <body>
   <div class="meta">{{ output_type }} · {{ language|upper }}</div>
   <h1>{{ title }}</h1>
+  {% if title_verdict %}
+  <p class="titleverdict">
+    <span class="badge {{ title_verdict }}">{{ title_verdict }}{% if title_confidence is not none %} {{ "%.2f"|format(title_confidence|round(2, 'floor')) }}{% endif %}</span>
+    {% if title_claim_ids %}<span class="cite">[{{ title_claim_ids|join(", ") }}]</span>{% else %}<span class="cite">headline cites no claim</span>{% endif %}
+  </p>
+  {% endif %}
 
   {% if coverage and coverage.warnings %}
   <div class="warnings">
@@ -54,7 +61,7 @@
         <td class="tc">{{ s.timecode or "" }}<div class="scene">{{ s.section or "" }}</div></td>
         <td>
           {{ s.text }}
-          {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence) }}{% endif %}</span>{% endif %}
+          {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence|round(2, 'floor')) }}{% endif %}</span>{% endif %}
           {% if s.claim_ids %}<span class="cite">[{{ s.claim_ids|join(", ") }}]</span>{% endif %}
         </td>
         <td class="os">{{ s.on_screen or "" }}</td>
@@ -70,7 +77,7 @@
     {% for s in sents %}
     <p class="sentence">
       {{ s.text }}
-      {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence) }}{% endif %}</span>{% endif %}
+      {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence|round(2, 'floor')) }}{% endif %}</span>{% endif %}
       {% if s.claim_ids %}<span class="cite">[{{ s.claim_ids|join(", ") }}]</span>{% endif %}
     </p>
     {% endfor %}
