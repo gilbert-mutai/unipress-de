@@ -123,12 +123,12 @@ FastAPI · Celery + Redis · PostgreSQL + Alembic · Chroma (vectors) · BGE-M3 
 
 ## Quickstart
 
-> _Populated as the build lands (Phase 0). The whole system comes up with a single command:_
+The whole system comes up with one command, and needs **no API key** to run — without one it uses a deterministic fallback generator, which is also what the test suites use:
 
 ```bash
-cp .env.example .env        # add your OpenAI key
+cp .env.example .env        # optionally add an OpenAI key + LLM_GENERATION=true
 docker compose --profile core up
-# add --profile observability for the Grafana/OTel stack
+# add --profile observability for the Grafana/OTel stack, --profile ml for MLflow
 ```
 
 Locally the services publish their own ports (unlike production, where only nginx is exposed):
@@ -145,10 +145,13 @@ Locally the services publish their own ports (unlike production, where only ngin
 
 ## Documentation
 
-The design is fully specified before code — the planning series lives in [`docs/`](docs/):
+**Start here if you want to understand or use the running system:** [`docs/09-live-system.md`](docs/09-live-system.md) — the as-built guide. What is deployed, how to drive the API, how it is operated, what is measured, and where it falls short.
+
+Docs `01`–`08` are the **design record**: the series was written before code, and it is kept as written so the reasoning behind each decision stays legible. Where a plan and the built system disagree, `09` is authoritative.
 
 | # | Doc | Contents |
 |---|---|---|
+| **09** | [**The Live System**](docs/09-live-system.md) | **As-built: usage, API, operations, limitations** |
 | 01 | [Project Definition](docs/01-project-definition.md) | Problem, users, pitch, scope |
 | 02 | [System Architecture](docs/02-architecture.md) | Components, MVP/production split |
 | 03 | [AI Pipeline & Anti-Hallucination](docs/03-ai-pipeline.md) | Data contracts, TrustLayer algorithm |
@@ -164,4 +167,13 @@ The primary corpus is the challenge's official sample materials — four CC BY 4
 
 ## Status
 
-Planning complete (docs 01–08); implementation in progress on `dev`, starting at Phase 0 of the [development plan](docs/08-dev-plan.md). Demo deadline: **25 September 2026**.
+**Live and end-to-end on a public HTTPS URL.** Phases 0–5 complete; Phase 6 (deploy, harden, demo) substantially delivered — see the [phase log](docs/08-dev-plan.md#8-phase-6--deploy-harden--demo). Demo deadline: **25 September 2026**.
+
+Working today, verified on the deployment:
+
+- A paper runs the full pipeline and produces all **five output types in Hungarian and English**, each with a per-sentence evidence trail and source highlighting
+- The **TrustLayer** blocks or flags unsupported and numerically-wrong claims — adversarial traps caught **5/5**, zero contradictions across the warm demo outputs
+- **Grafana** shows live ops *and* eval metrics; the eval harness produces a versioned MLflow report
+- Nightly backups, a **verified** zero-downtime restore rehearsal, and a scripted redeploy
+
+Known gaps are listed honestly in [`09` §9](docs/09-live-system.md#9-known-limitations) — the main ones being `key_fact_coverage` below target (0.20), Hungarian confidence trailing English, and SSH hardening not yet applied to the VM.
