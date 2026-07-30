@@ -22,6 +22,63 @@ def test_numeric_mismatch_catches_wrong_number() -> None:
     assert numeric_mismatch("A qualitative improvement.", PREMISE) is False  # no numbers
 
 
+def test_numeric_mismatch_reads_hungarian_decimal_commas() -> None:
+    """HU writes 88,8 where the EN source writes 88.8 — that is not a mismatch.
+
+    Reading every comma as a thousands separator turned 88,8 into 888 and made
+    the TrustLayer return CONTRADICTED for correct Hungarian sentences.
+    """
+    assert numeric_mismatch("A pontosság 88,8% volt.", PREMISE) is False
+    assert numeric_mismatch("339 kenetet vizsgáltak.", PREMISE) is False
+    # …and a genuinely wrong Hungarian number is still caught.
+    assert numeric_mismatch("A pontosság 98,8% volt.", PREMISE) is True
+
+
+def test_numeric_mismatch_still_reads_english_thousands_separators() -> None:
+    premise = "The ensemble produced 12,000,000 cell predictions across 1,234 slides."
+    assert numeric_mismatch("It made 12,000,000 predictions.", premise) is False
+    assert numeric_mismatch("Across 1,234 slides.", premise) is False
+    assert numeric_mismatch("Across 9,999 slides.", premise) is True
+
+
+def test_numeric_mismatch_ignores_digits_inside_identifiers() -> None:
+    """A leaked "(clm_003, clm_005)" citation is not a numeric claim.
+
+    Reading the digits out of clm_003 hard-failed correct sentences to
+    CONTRADICTED — observed in production on the Hungarian video script.
+    """
+    assert numeric_mismatch("It raises capacity (clm_003, clm_005).", PREMISE) is False
+    assert numeric_mismatch("88,8%-os pontosság (clm_002, clm_024).", PREMISE) is False
+
+
+def test_numeric_mismatch_reads_spelled_out_numbers_in_the_source() -> None:
+    """The paper writes "nine networks"; a translated sentence writes "9"."""
+    premise = "The system used an ensemble of nine deep neural networks."
+    assert numeric_mismatch("A 9 modellből álló háló.", premise) is False
+    assert numeric_mismatch("An ensemble of 9 networks.", premise) is False
+    assert numeric_mismatch("An ensemble of 42 networks.", premise) is True
+
+
+def test_prose_words_are_not_numeric_obligations() -> None:
+    """Hungarian "egy" is the indefinite article, not a claim that something is 1.
+
+    Expanding number words on the *sentence* side turned "Egy új tanulmány
+    szerint…" ("A new study…") into "1 új tanulmány" and hard-failed it. Only the
+    premise is expanded, so prose like this carries no numeric obligation.
+    """
+    assert numeric_mismatch("Egy új tanulmány szerint a rendszer segít.", PREMISE) is False
+    assert numeric_mismatch("A szűrés egy munkaigényes folyamat.", PREMISE) is False
+    assert numeric_mismatch("Kilenc modellt alkalmaz.", PREMISE) is False
+    # An actual numeral in the sentence is still checked.
+    assert numeric_mismatch("A rendszer 9 modellt alkalmaz.", PREMISE) is True
+
+
+def test_numeric_mismatch_handles_mixed_separators() -> None:
+    """Both conventions for one thousand and a bit."""
+    assert numeric_mismatch("Total was 1.234,5 units.", "Total was 1,234.5 units.") is False
+    assert numeric_mismatch("Total was 9.999,5 units.", "Total was 1,234.5 units.") is True
+
+
 def _output(*sentences: GeneratedSentence) -> GeneratedOutput:
     return GeneratedOutput(
         output_type=OutputType.PRESS_RELEASE, language="en", title="t", sentences=list(sentences)

@@ -124,3 +124,14 @@ def test_generate_requires_ingested_document(client: TestClient) -> None:
         client.post("/documents/nope/outputs", json={"output_type": "PRESS_RELEASE"}).status_code
         == 404
     )
+
+
+def test_inline_claim_citations_are_stripped_from_prose() -> None:
+    """Claim ids belong in claim_ids, not in published text."""
+    from app.generation.llm_generator import _strip_inline_citations
+
+    assert _strip_inline_citations("It raises capacity (clm_003, clm_005).") == (
+        "It raises capacity."
+    )
+    assert _strip_inline_citations("Ends here [CLM-12] .") == "Ends here."
+    assert _strip_inline_citations("Nothing to strip here.") == "Nothing to strip here."
