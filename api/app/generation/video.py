@@ -48,7 +48,8 @@ def build_video_scenes(claims: list[ClaimInput], language: str, title_hint: str)
     pool = sorted(claims, key=lambda c: c.importance, reverse=True)
     used: set[str] = set()
     sentences: list[GeneratedSentence] = []
-    title = next((c.text for c in pool if c.claim_type == ClaimType.FINDING), title_hint)
+    title_claim = next((c for c in pool if c.claim_type == ClaimType.FINDING), None)
+    title = title_claim.text if title_claim else title_hint
 
     def take(preferred: list[str]) -> ClaimInput | None:
         for want in preferred:
@@ -94,5 +95,6 @@ def build_video_scenes(claims: list[ClaimInput], language: str, title_hint: str)
         output_type=OutputType.VIDEO_SCRIPT,
         language=language,
         title=title,
+        title_claim_ids=[title_claim.key] if title_claim else [],
         sentences=sentences,
     )

@@ -28,7 +28,11 @@ _SYSTEM = (
     "the provided claims. Every factual sentence MUST cite one or more claim IDs from "
     "the list and MUST NOT introduce facts, numbers, or names not present in the claims. "
     "Mark hooks/connectives as role RHETORICAL or TRANSITION (no claim IDs). "
-    'Return JSON: {"title":str,"sentences":[{"text":str,"role":'
+    "The TITLE is verified exactly like a factual sentence: it must cite the claim "
+    "IDs it rests on in title_claim_ids, state nothing those claims do not support, "
+    "and avoid superlatives and unqualified figures — a result obtained only in "
+    "simulation must not be titled as an achieved outcome. "
+    'Return JSON: {"title":str,"title_claim_ids":[str],"sentences":[{"text":str,"role":'
     '"FACT|INTERPRETATION|RHETORICAL|TRANSITION","claim_ids":[str],"section":str}]}.'
 )
 
@@ -39,8 +43,12 @@ _VIDEO_SYSTEM = (
     "facts/numbers), on_screen (a very short on-screen caption), visual (a visual suggestion), "
     "timecode (e.g. '0:20–0:45'), section (the scene name), role "
     "(FACT for narrated claims; RHETORICAL for the hook/cta). "
-    'Return JSON: {"title":str,"sentences":[{"text":str,"role":str,"claim_ids":[str],'
-    '"section":str,"timecode":str,"on_screen":str,"visual":str}]}.'
+    "The TITLE is verified exactly like a factual sentence: cite the claim IDs it "
+    "rests on in title_claim_ids, claim nothing beyond them, and avoid superlatives "
+    "and unqualified figures. "
+    'Return JSON: {"title":str,"title_claim_ids":[str],"sentences":[{"text":str,'
+    '"role":str,"claim_ids":[str],"section":str,"timecode":str,"on_screen":str,'
+    '"visual":str}]}.'
 )
 
 
@@ -111,7 +119,8 @@ def _parse(payload: dict, spec: OutputSpec, language: str, title_hint: str) -> G
     return GeneratedOutput(
         output_type=spec.output_type,
         language=language,
-        title=(payload.get("title") or title_hint).strip(),
+        title=_strip_inline_citations((payload.get("title") or title_hint).strip()),
+        title_claim_ids=[str(c) for c in payload.get("title_claim_ids", [])],
         sentences=sentences,
     )
 

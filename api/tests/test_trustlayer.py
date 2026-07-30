@@ -183,3 +183,45 @@ def test_coverage_flags_dropped_limitation() -> None:
     assert "clm_002" in report["dropped_limitations"]
     assert "clm_001" in report["cited"]
     assert report["warnings"]
+
+
+def test_title_is_verified_like_a_sentence() -> None:
+    """The headline is the most-quoted line, so it carries a verdict too."""
+    from app.generation.models import GeneratedOutput, OutputType
+
+    claims = {"clm_001": ClaimEvidence(key="clm_001", quote=PREMISE)}
+
+    grounded = GeneratedOutput(
+        output_type=OutputType.PRESS_RELEASE,
+        language="en",
+        title="The method reached 88.8% accuracy on 339 smears.",
+        title_claim_ids=["clm_001"],
+        sentences=[],
+    )
+    verify_output(grounded, claims)
+    assert grounded.title_verdict == Verdict.SUPPORTED
+    assert grounded.title_confidence is not None
+
+    # A headline overstating its claim must not pass as supported.
+    overclaimed = GeneratedOutput(
+        output_type=OutputType.PRESS_RELEASE,
+        language="en",
+        title="The method reached 98.8% accuracy on 339 smears.",
+        title_claim_ids=["clm_001"],
+        sentences=[],
+    )
+    verify_output(overclaimed, claims)
+    assert overclaimed.title_verdict == Verdict.CONTRADICTED
+
+    # A headline citing nothing is unsupported, not silently accepted.
+    uncited = GeneratedOutput(
+        output_type=OutputType.PRESS_RELEASE,
+        language="en",
+        title="Revolutionary breakthrough achieves a 100% success rate.",
+        title_claim_ids=[],
+        sentences=[],
+    )
+    verify_output(uncited, claims)
+    assert uncited.title_verdict == Verdict.UNSUPPORTED
+    assert uncited.title_confidence == 0.0
+    assert uncited.title_rationale == "no cited claim found in the source"

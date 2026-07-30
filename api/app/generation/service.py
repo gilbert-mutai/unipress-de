@@ -60,6 +60,10 @@ def generate_output(document_id: str, output_type: str, language: str) -> str:
             output_type=output.output_type.value,
             language=language,
             title=output.title,
+            title_claim_ids=output.title_claim_ids or None,
+            title_verdict=output.title_verdict.value if output.title_verdict else None,
+            title_confidence=output.title_confidence,
+            title_rationale=output.title_rationale,
             status="done",
             coverage=coverage,
         )
