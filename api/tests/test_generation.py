@@ -135,3 +135,14 @@ def test_inline_claim_citations_are_stripped_from_prose() -> None:
     )
     assert _strip_inline_citations("Ends here [CLM-12] .") == "Ends here."
     assert _strip_inline_citations("Nothing to strip here.") == "Nothing to strip here."
+
+
+def test_language_rule_covers_every_field() -> None:
+    """Naming the language only in the user prompt left HU titles in English."""
+    from app.generation.llm_generator import _language_rule
+
+    hu = _language_rule("hu")
+    assert "Hungarian" in hu
+    assert "title" in hu
+    assert "on-screen" in hu  # video captions were English too
+    assert "English" in _language_rule("en")
