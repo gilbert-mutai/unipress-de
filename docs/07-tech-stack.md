@@ -3,6 +3,11 @@
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`06-dataset-strategy.md`](06-dataset-strategy.md)
 > A production-oriented stack. Resolves the open decisions from [`02-architecture.md`](02-architecture.md) §9 and [`03-ai-pipeline.md`](03-ai-pipeline.md) §9.
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 0. Engineering stance & selection criteria

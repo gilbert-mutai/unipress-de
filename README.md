@@ -117,9 +117,26 @@ A sentence citing nothing, or citing a claim that isn't in the store, is `UNSUPP
 
 The dashboard shows each sentence with its role, verdict, confidence and cited quote, plus the highlighted region of the original PDF. Nothing is presented as automatically publishable: the reviewer accepts, edits or flags, then exports bilingual HTML/PDF with attribution.
 
-## Tech stack (summary)
+## Tech stack
 
-FastAPI · Celery + Redis · PostgreSQL + Alembic · Chroma (vectors) · BGE-M3 embeddings · DeBERTa NLI · LiteLLM → OpenAI (Ollama optional) · Next.js · OpenTelemetry / Prometheus / Grafana · Docker Compose. Full rationale in [`docs/07-tech-stack.md`](docs/07-tech-stack.md).
+What actually runs, in the roles it plays:
+
+| Layer | Component |
+|---|---|
+| API · async work | FastAPI · Celery + Redis · Flower |
+| Stores | PostgreSQL + Alembic (claims, outputs, jobs) · Chroma (vectors) · volumes for uploads + model cache |
+| Parsing | PyMuPDF (text, page/char spans, bounding boxes) |
+| Embeddings | `intfloat/multilingual-e5-small` (HU + EN; BGE-M3 is a one-line `EMBED_MODEL` swap) |
+| Trust — Tier 1 | `MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7`, local, no API cost |
+| Trust — Tier 2 | `gpt-4o-mini` judge via LiteLLM |
+| Generation | `gpt-4o` via LiteLLM (provider-swappable; deterministic fallback with no key) |
+| Frontend | Next.js 14 (App Router) + Tailwind |
+| Edge | nginx single origin + Certbot TLS |
+| Observability | Prometheus + Pushgateway · Grafana · OpenTelemetry → Tempo |
+| Eval | custom metrics + RAGAS + textstat · MLflow tracking |
+| Packaging | Docker Compose, profiled (`core`, `observability`, `ml`, `local-llm`) |
+
+The reasoning behind each choice is in [`docs/07-tech-stack.md`](docs/07-tech-stack.md); the deployed shape is in [`docs/09-live-system.md`](docs/09-live-system.md).
 
 ## Quickstart
 

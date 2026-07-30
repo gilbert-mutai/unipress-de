@@ -3,6 +3,11 @@
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`04-content-outputs.md`](04-content-outputs.md)
 > How we prove the system works with numbers — automated + human — realistically for a solo student project, without a research-scale dataset.
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 0. Philosophy

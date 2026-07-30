@@ -4,6 +4,11 @@
 > Status: Definition locked · Build mode: Solo · LLM strategy: Hybrid (open-source core + OpenAI for generation, swappable via LiteLLM)
 > Demo deadline: 25 September 2026 · Possible AI Sprint Final: 9–10 October 2026
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 1. Name

@@ -3,6 +3,11 @@
 > **DEIK.AI Challenge 2026 · Category 2.C** · Companion to [`03-ai-pipeline.md`](03-ai-pipeline.md)
 > The five output types, their specs, and how one verified claim set fans out to many audiences without losing factual fidelity.
 
+> **Design record.** Written before the build and kept as written, so the reasoning
+> behind each decision stays legible. It is not a to-do list and not a description of
+> the deployed system — for that see [`09-live-system.md`](09-live-system.md), which is
+> authoritative wherever the two differ.
+
 ---
 
 ## 0. The fan-out principle
