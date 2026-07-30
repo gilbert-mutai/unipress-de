@@ -44,6 +44,18 @@ _VIDEO_SYSTEM = (
 )
 
 
+_LANGUAGES = {"en": "English", "hu": "Hungarian"}
+
+
+def _language_rule(language: str) -> str:
+    name = _LANGUAGES.get(language, language)
+    return (
+        f" Write EVERY field in {name} — the title and, for video scripts, the "
+        f"on-screen captions and visual suggestions, not only the body text. "
+        f"Claim IDs stay verbatim; do not translate or restyle them."
+    )
+
+
 def _prompt(spec: OutputSpec, claims: list[ClaimInput], language: str) -> str:
     claim_lines = "\n".join(f"[{c.key}] ({c.claim_type}) {c.text}" for c in claims)
     return (
@@ -114,7 +126,12 @@ def generate_llm(
     from app.core.settings import get_settings
 
     gateway = LiteLLMGateway(model=get_settings().llm_generation_model)
-    system = _VIDEO_SYSTEM if spec.output_type == OutputType.VIDEO_SCRIPT else _SYSTEM
+    base = _VIDEO_SYSTEM if spec.output_type == OutputType.VIDEO_SCRIPT else _SYSTEM
+    # Naming the language once in the user prompt was not enough: Hungarian social
+    # posts and video scripts came back with correct HU prose but an English title
+    # every time, the model treating "title" (and the video captions) as metadata
+    # rather than output. Every SOCIAL/hu and VIDEO_SCRIPT/hu run was affected.
+    system = base + _language_rule(language)
     user = _prompt(spec, claims, language)
     output = _parse(gateway.complete_json(system, user), spec, language, title_hint)
 
@@ -124,5 +141,8 @@ def generate_llm(
             "\n\nEVERY factual sentence must include at least one claim_id, or be "
             "marked RHETORICAL/TRANSITION. Fix and return the same JSON."
         )
-        output = _parse(gateway.complete_json(_SYSTEM, repair), spec, language, title_hint)
+        # Repair with the SAME system prompt: using the generic one for a video
+        # script would drop the scene fields (timecode/on_screen/visual) and the
+        # language rule along with them.
+        output = _parse(gateway.complete_json(system, repair), spec, language, title_hint)
     return output
