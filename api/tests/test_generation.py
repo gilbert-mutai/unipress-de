@@ -146,3 +146,28 @@ def test_language_rule_covers_every_field() -> None:
     assert "title" in hu
     assert "on-screen" in hu  # video captions were English too
     assert "English" in _language_rule("en")
+
+
+def test_role_name_as_sentence_text_is_dropped() -> None:
+    """The model sometimes emits "TRANSITION" as the sentence itself."""
+    from app.generation.llm_generator import _parse
+    from app.generation.models import OutputType
+    from app.generation.specs import SPECS
+
+    spec = SPECS[OutputType.PRESS_RELEASE]
+    payload = {
+        "title": "A grounded headline.",
+        "title_claim_ids": ["clm_001"],
+        "sentences": [
+            {"text": "A real sentence.", "role": "FACT", "claim_ids": ["clm_001"]},
+            {"text": "TRANSITION", "role": "TRANSITION", "claim_ids": []},
+            {"text": "Rhetorical.", "role": "RHETORICAL", "claim_ids": []},
+            {"text": "  fact:  ", "role": "FACT", "claim_ids": []},
+            {"text": "", "role": "FACT", "claim_ids": []},
+        ],
+    }
+    out = _parse(payload, spec, "en", "hint")
+    # Any casing or trailing punctuation of a bare role word goes: "TRANSITION",
+    # "Rhetorical." and "  fact:  " all carry no content.
+    assert [s.text for s in out.sentences] == ["A real sentence."]
+    assert out.title_claim_ids == ["clm_001"]

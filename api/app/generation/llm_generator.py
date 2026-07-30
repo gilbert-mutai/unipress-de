@@ -53,6 +53,7 @@ _VIDEO_SYSTEM = (
 
 
 _LANGUAGES = {"en": "English", "hu": "Hungarian"}
+_ROLE_WORDS = {r.value for r in SentenceRole}
 
 
 def _language_rule(language: str) -> str:
@@ -99,7 +100,10 @@ def _parse(payload: dict, spec: OutputSpec, language: str, title_hint: str) -> G
     sentences: list[GeneratedSentence] = []
     for raw in payload.get("sentences", []):
         text = _strip_inline_citations((raw.get("text") or "").strip())
-        if not text:
+        # The model occasionally emits the role name as the sentence itself, which
+        # renders as an empty card reading "TRANSITION". Observed three times in one
+        # press release. Dropping them is safe: they carry no content by definition.
+        if not text or text.upper().rstrip(".:") in _ROLE_WORDS:
             continue
         try:
             role = SentenceRole(raw.get("role", "FACT"))
