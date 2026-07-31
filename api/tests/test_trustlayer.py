@@ -225,3 +225,43 @@ def test_title_is_verified_like_a_sentence() -> None:
     assert uncited.title_verdict == Verdict.UNSUPPORTED
     assert uncited.title_confidence == 0.0
     assert uncited.title_rationale == "no cited claim found in the source"
+
+
+def test_english_confidence_is_unchanged_by_the_cross_language_rule() -> None:
+    """Same-language scoring must be bit-identical: the gold targets depend on it."""
+    from app.trustlayer.scorer import confidence
+
+    for entail, ovl, judge in [
+        (0.99, 0.88, None),
+        (0.21, 0.53, None),
+        (0.99, 0.88, 0.9),
+        (0.40, 0.10, 0.5),
+        (0.0, 0.0, 0.0),
+    ]:
+        # Weights sum to 1.0, so the normalised form equals the historical formula.
+        legacy = (
+            (0.4 * entail + 0.2 * ovl) / 0.6
+            if judge is None
+            else 0.4 * entail + 0.4 * judge + 0.2 * ovl
+        )
+        assert abs(confidence(entail, ovl, False, judge) - legacy) < 1e-9
+
+
+def test_cross_language_drops_the_lexical_term() -> None:
+    """A Hungarian sentence must not be penalised for not reusing English words."""
+    from app.trustlayer.scorer import confidence
+
+    entail, judge = 0.99, 0.8
+    # Overlap near zero purely because the languages differ.
+    penalised = confidence(entail, 0.0, False, judge, lexical_comparable=True)
+    fair = confidence(entail, 0.0, False, judge, lexical_comparable=False)
+    assert fair > penalised
+    assert abs(fair - (0.4 * entail + 0.4 * judge) / 0.8) < 1e-9
+    # It cannot invent support: weak signals stay weak.
+    assert confidence(0.1, 0.0, False, 0.1, lexical_comparable=False) < 0.45
+
+
+def test_cross_language_rule_respects_the_numeric_penalty() -> None:
+    from app.trustlayer.scorer import confidence
+
+    assert confidence(0.99, 0.0, True, 0.9, lexical_comparable=False) < 0.45

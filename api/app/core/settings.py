@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     trust_export_threshold: float = Field(default=0.7)
     trust_low_threshold: float = Field(default=0.45)
     trust_entail_high: float = Field(default=0.85)  # skip judge if entail above this
+    # Drop the quote-overlap term when the output language differs from the
+    # source's — across languages it measures nothing (see trustlayer/scorer.py).
+    # Set false to score every language with the same lexical term.
+    trust_cross_language_reweight: bool = Field(default=True)
     trust_contradict_cutoff: float = Field(default=0.5)  # NLI contradiction => hard fail
 
     @property
