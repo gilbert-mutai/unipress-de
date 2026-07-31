@@ -2,9 +2,19 @@
 
     confidence = w1*P_entail + w2*judge_supported + w3*quote_overlap  - numeric_penalty
 
-Until the LLM judge lands (Phase 2b) `judge_supported` is None and its weight is
-redistributed across the available signals. A numeric mismatch applies a hard
-penalty that drives confidence down regardless of the other signals.
+A signal that could not be measured has its weight redistributed across the ones
+that could, rather than counting as zero support:
+
+- `judge_supported` is None when the Tier-2 judge is disabled or was not gated in.
+- `quote_overlap` is meaningless when the output language differs from the source's.
+  A Hungarian sentence shares almost no content words with an English quote, so the
+  term scored ~0 for every Hungarian sentence and cost it roughly a third of the
+  blend. That is absence of measurement, not evidence of ungroundedness — and it
+  is why Hungarian outputs ran 0.38–0.62 against English's 0.58–0.89 on the same
+  claims. Redistribution cannot invent support: if entailment and the judge are
+  both low, the renormalised score stays low.
+
+A numeric mismatch applies a hard penalty regardless of the other signals.
 """
 
 from __future__ import annotations
@@ -27,13 +37,29 @@ def confidence(
     quote_ovl: float,
     numeric_bad: bool,
     judge_supported: float | None = None,
+    *,
+    lexical_comparable: bool = True,
 ) -> float:
+    """Blend the trust signals into one confidence.
+
+    `lexical_comparable=False` drops the quote-overlap term and renormalises,
+    for text written in a different language from the source it cites.
+    """
     s = get_settings()
-    if judge_supported is None:
-        total = s.trust_w1 + s.trust_w3 or 1.0
-        base = (s.trust_w1 * p_entail + s.trust_w3 * quote_ovl) / total
-    else:
-        base = s.trust_w1 * p_entail + s.trust_w2 * judge_supported + s.trust_w3 * quote_ovl
+    w1, w2, w3 = s.trust_w1, s.trust_w2, s.trust_w3
+    if not lexical_comparable:
+        w3 = 0.0
+
+    weighted = w1 * p_entail
+    total = w1
+    if judge_supported is not None:
+        weighted += w2 * judge_supported
+        total += w2
+    if w3:
+        weighted += w3 * quote_ovl
+        total += w3
+
+    base = weighted / (total or 1.0)
     if numeric_bad:
         base -= s.trust_numeric_penalty
     return max(0.0, min(1.0, base))

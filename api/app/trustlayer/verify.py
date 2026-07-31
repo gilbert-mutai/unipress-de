@@ -23,6 +23,7 @@ from app.core.settings import get_settings
 from app.generation.models import GeneratedOutput, SentenceRole, Verdict
 from app.trustlayer.entailment import get_entailment
 from app.trustlayer.judge import get_judge, judge_enabled
+from app.trustlayer.language import same_language
 from app.trustlayer.numeric import numbers, numeric_mismatch
 from app.trustlayer.scorer import confidence, quote_overlap
 
@@ -64,11 +65,25 @@ def _assess(
     numeric_bad = numeric_mismatch(text, premise)
     scores = entailment.classify(premise, text)
 
+    # Comparing content words across languages measures nothing: a Hungarian
+    # sentence shares almost none with an English quote. Where that is the case
+    # the overlap term is dropped and its weight redistributed, rather than
+    # scored as if it had found no support.
+    lexical_comparable = not s.trust_cross_language_reweight or same_language(text, premise)
+
     # Hard fails first.
     if numeric_bad:
         return Assessment(
             Verdict.CONTRADICTED,
-            round(confidence(scores.entail, quote_overlap(text, premise), True), 3),
+            round(
+                confidence(
+                    scores.entail,
+                    quote_overlap(text, premise),
+                    True,
+                    lexical_comparable=lexical_comparable,
+                ),
+                3,
+            ),
             "a number is not corroborated by the cited source",
         )
     if scores.contradict > s.trust_contradict_cutoff:
@@ -89,7 +104,16 @@ def _assess(
             return Assessment(Verdict.CONTRADICTED, round(min(0.2, judge_supported), 3), rationale)
 
     overlap = quote_overlap(text, premise)
-    score = round(confidence(scores.entail, overlap, False, judge_supported), 3)
+    score = round(
+        confidence(
+            scores.entail,
+            overlap,
+            False,
+            judge_supported,
+            lexical_comparable=lexical_comparable,
+        ),
+        3,
+    )
 
     if score >= s.trust_export_threshold:
         return Assessment(Verdict.INTERPRETATION if soften else Verdict.SUPPORTED, score, rationale)
