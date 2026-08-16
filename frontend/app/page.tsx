@@ -27,33 +27,6 @@ const OUTPUT_TYPES = [
   ["VIDEO_SCRIPT", "Video script"],
 ];
 
-// Remembering the last paper keeps an accidental reload mid-demo from losing it.
-const LAST_DOC_KEY = "unipress:lastDocumentId";
-
-function remember(id: string) {
-  try {
-    localStorage.setItem(LAST_DOC_KEY, id);
-  } catch {
-    /* private mode / storage disabled — the ?doc= param still works */
-  }
-}
-
-function readRemembered(): string | null {
-  try {
-    return localStorage.getItem(LAST_DOC_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function forget() {
-  try {
-    localStorage.removeItem(LAST_DOC_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
 export default function Home() {
   const [doc, setDoc] = useState<DocumentRead | null>(null);
   const [claimsByKey, setClaimsByKey] = useState<Record<string, ClaimRead>>({});
@@ -72,34 +45,25 @@ export default function Home() {
     setError(null);
     setBusy(true);
     try {
-      const uploaded = await uploadDocument(file);
-      setDoc(uploaded);
-      remember(uploaded.id);
+      setDoc(await uploadDocument(file));
     } catch (e) {
       setError(String(e));
       setBusy(false);
     }
   }
 
-  // Open an already-ingested paper: ?doc=<id>, else the last one this browser
-  // used. Without this the only route to a document is uploading it, so a reload
-  // loses the paper and re-uploading mints a new document — which means the
-  // pre-generated outputs (ops/pregenerate.sh) are unreachable and every demo
-  // click is a live model call. A bookmark per paper is the demo path.
+  // Open an already-ingested paper with ?doc=<id> — the demo path, since those
+  // documents already have their outputs generated, so a click costs no model
+  // call. Deliberately only the explicit parameter: a bare URL always starts at
+  // the upload box, so the full pipeline can be shown (or recorded) from
+  // nothing. Nothing is remembered between visits.
   useEffect(() => {
-    const wanted =
-      new URLSearchParams(window.location.search).get("doc") ?? readRemembered();
+    const wanted = new URLSearchParams(window.location.search).get("doc");
     if (!wanted) return;
     setBusy(true);
     getDocument(wanted)
-      .then((d) => {
-        setDoc(d);
-        remember(d.id);
-      })
-      .catch(() => {
-        forget(); // stale id (restored backup, pruned document): start clean
-        setBusy(false);
-      });
+      .then(setDoc)
+      .catch(() => setBusy(false)); // unknown id: fall back to the upload box
     // Runs once on mount by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
