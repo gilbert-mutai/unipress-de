@@ -139,7 +139,11 @@ export function pageImageUrl(
   documentId: string,
   page: number,
   bbox?: number[] | null,
+  zoom?: number,
 ): string {
-  const q = bbox && bbox.length === 4 ? `?bbox=${bbox.join(",")}` : "";
-  return `${API_BASE}/documents/${documentId}/pages/${page}.png${q}`;
+  const params = new URLSearchParams();
+  if (bbox && bbox.length === 4) params.set("bbox", bbox.join(","));
+  if (zoom && zoom > 2) params.set("zoom", String(Math.min(4, zoom)));
+  const q = params.toString();
+  return `${API_BASE}/documents/${documentId}/pages/${page}.png${q ? `?${q}` : ""}`;
 }

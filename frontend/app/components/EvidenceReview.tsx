@@ -3,7 +3,16 @@
 import { useMemo, useState } from "react";
 import { ClaimRead, OutputDetail, pageImageUrl, renderUrl, SentenceRead } from "../lib/api";
 import { cn } from "../lib/utils";
-import { AlertTriangle, Check, Download, ExternalLink, Flag } from "./icons";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Download,
+  ExternalLink,
+  Flag,
+  Minus,
+  Plus,
+} from "./icons";
 import { Button } from "./ui/button";
 import { Chip, VerdictBadge } from "./ui/badge";
 
@@ -21,6 +30,30 @@ export default function EvidenceReview({
   );
   const [accepted, setAccepted] = useState<Set<number>>(new Set());
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
+  const [zoom, setZoom] = useState(1);
+  // An omitted claim has no sentence to select, so the evidence panel can also be
+  // focused on a claim key directly — that is how a reviewer inspects what was
+  // left out and where it sits in the paper.
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [showOmissions, setShowOmissions] = useState(false);
+
+  const omissions = useMemo(() => {
+    const c = output.coverage;
+    if (!c) return [];
+    const seen = new Set<string>();
+    const rows: { key: string; claim: ClaimRead | undefined; kind: "caveat" | "important" }[] = [];
+    for (const key of c.dropped_limitations ?? []) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ key, claim: claimsByKey[key], kind: "caveat" });
+    }
+    for (const key of c.omitted_important ?? []) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ key, claim: claimsByKey[key], kind: "important" });
+    }
+    return rows;
+  }, [output.coverage, claimsByKey]);
 
   const toggle = (set: Set<number>, i: number, set2: (s: Set<number>) => void) => {
     const next = new Set(set);
@@ -29,19 +62,87 @@ export default function EvidenceReview({
   };
 
   const selectedClaims = useMemo(() => {
+    if (focusKey) {
+      const c = claimsByKey[focusKey];
+      return c ? [c] : [];
+    }
     if (selected == null) return [];
     const s = output.sentences.find((x) => x.order_index === selected);
     return (s?.claim_ids ?? []).map((k) => claimsByKey[k]).filter(Boolean) as ClaimRead[];
-  }, [selected, output, claimsByKey]);
+  }, [focusKey, selected, output, claimsByKey]);
+
+  // Selecting a sentence and inspecting an omission are mutually exclusive views
+  // of the same panel.
+  const selectSentence = (i: number) => {
+    setFocusKey(null);
+    setSelected(i);
+  };
+  const inspectOmission = (key: string) => {
+    setFocusKey(key);
+    setZoom(1);
+  };
 
   const primary = selectedClaims[0];
 
   return (
     <div>
       {output.coverage?.warnings?.length ? (
-        <div className="mb-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{output.coverage.warnings.join(" · ")}</span>
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <button
+            onClick={() => setShowOmissions((v) => !v)}
+            disabled={!omissions.length}
+            className="flex w-full items-start gap-2 px-4 py-3 text-left"
+            aria-expanded={showOmissions}
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{output.coverage.warnings.join(" · ")}</span>
+            {omissions.length ? (
+              <span className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap font-medium underline decoration-dotted">
+                {showOmissions ? "Hide" : "Show which"}
+                <ChevronDown
+                  className={cn("h-4 w-4 transition-transform", showOmissions && "rotate-180")}
+                />
+              </span>
+            ) : null}
+          </button>
+
+          {showOmissions && (
+            <ul className="animate-fade-in space-y-2 border-t border-amber-200 px-4 py-3 dark:border-amber-500/30">
+              {omissions.map(({ key, claim, kind }) => (
+                <li key={key}>
+                  <button
+                    onClick={() => inspectOmission(key)}
+                    disabled={!claim}
+                    className={cn(
+                      "w-full rounded-lg border border-amber-200/70 bg-white/60 px-3 py-2 text-left transition-colors dark:border-amber-500/20 dark:bg-black/10",
+                      claim && "hover:border-amber-400 dark:hover:border-amber-500/50",
+                      focusKey === key && "border-amber-500 ring-1 ring-amber-500/40",
+                    )}
+                  >
+                    <span className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="font-mono font-semibold">{key}</span>
+                      <Chip>{kind === "caveat" ? "caveat dropped" : "high importance"}</Chip>
+                      {claim ? <Chip>{claim.claim_type}</Chip> : null}
+                      {claim ? <Chip>page {claim.page}</Chip> : null}
+                    </span>
+                    {claim ? (
+                      <span className="mt-1 block text-xs italic leading-snug text-ink/80 dark:text-amber-100/80">
+                        “{claim.quote.length > 220 ? `${claim.quote.slice(0, 220)}…` : claim.quote}”
+                      </span>
+                    ) : (
+                      <span className="mt-1 block text-xs">
+                        claim not loaded — reopen the document to inspect it
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+              <li className="pt-1 text-[11px]">
+                These claims are in the paper but not in this output. Select one to see it
+                highlighted in the source, then edit the draft if it belongs.
+              </li>
+            </ul>
+          )}
         </div>
       ) : null}
 
@@ -99,7 +200,7 @@ export default function EvidenceReview({
                 selected={s.order_index === selected}
                 accepted={accepted.has(s.order_index)}
                 flagged={flagged.has(s.order_index)}
-                onSelect={() => setSelected(s.order_index)}
+                onSelect={() => selectSentence(s.order_index)}
                 onAccept={() => toggle(accepted, s.order_index, setAccepted)}
                 onFlag={() => toggle(flagged, s.order_index, setFlagged)}
               />
@@ -109,9 +210,23 @@ export default function EvidenceReview({
 
         {/* Right — evidence */}
         <div className="lg:sticky lg:top-20 lg:self-start">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-            Source evidence
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            {focusKey ? "Omitted claim" : "Source evidence"}
+            {focusKey ? (
+              <button
+                onClick={() => setFocusKey(null)}
+                className="ml-auto font-medium normal-case tracking-normal text-brand underline decoration-dotted"
+              >
+                back to the draft
+              </button>
+            ) : null}
           </div>
+
+          {focusKey ? (
+            <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              This claim is in the paper but was left out of the output.
+            </p>
+          ) : null}
 
           {!primary ? (
             <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">
@@ -133,16 +248,51 @@ export default function EvidenceReview({
               </blockquote>
 
               {/* The real paper page with the cited span highlighted */}
-              <figure className="overflow-hidden rounded-xl border border-line bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pageImageUrl(documentId, primary.page, primary.bbox)}
-                  alt={`Source page ${primary.page}`}
-                  className="w-full"
-                  loading="lazy"
-                />
+              <figure className="rounded-xl border border-line bg-white">
+                <div className="flex items-center gap-1.5 border-b border-line bg-paper px-2 py-1.5">
+                  <span className="mr-auto text-[11px] text-muted">
+                    Page {primary.page} · highlighted region is the cited passage
+                  </span>
+                  <button
+                    onClick={() => setZoom((z) => Math.max(1, +(z - 0.5).toFixed(1)))}
+                    disabled={zoom <= 1}
+                    aria-label="Zoom out"
+                    className="flex h-6 w-6 items-center justify-center rounded-md bg-line/60 text-muted transition-colors hover:bg-line disabled:opacity-40"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setZoom(1)}
+                    className="rounded-md bg-line/60 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted transition-colors hover:bg-line"
+                    aria-label="Reset zoom"
+                  >
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button
+                    onClick={() => setZoom((z) => Math.min(4, +(z + 0.5).toFixed(1)))}
+                    disabled={zoom >= 4}
+                    aria-label="Zoom in"
+                    className="flex h-6 w-6 items-center justify-center rounded-md bg-line/60 text-muted transition-colors hover:bg-line disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {/* Scroll container: magnified pages are panned, not squeezed. */}
+                <div className={cn("max-h-[70vh] overflow-auto", zoom > 1 && "cursor-move")}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    // Past 2x the request asks the server for a higher-resolution
+                    // render, so magnifying reveals detail instead of enlarging
+                    // the same pixels. The first load stays at the default.
+                    src={pageImageUrl(documentId, primary.page, primary.bbox, zoom * 2)}
+                    alt={`Source page ${primary.page}`}
+                    style={{ width: `${zoom * 100}%` }}
+                    className="max-w-none"
+                    loading="lazy"
+                  />
+                </div>
                 <figcaption className="border-t border-line bg-paper px-3 py-1.5 text-[11px] text-muted">
-                  Original source · page {primary.page} — the highlighted region is the cited passage.
+                  Original source — zoom to read the surrounding text.
                 </figcaption>
               </figure>
 
@@ -215,6 +365,19 @@ function SentenceCard({
           )}
         </div>
       )}
+      {/* Why the verdict fell where it did. Shown for anything short of clearly
+          supported, because that is when a reviewer needs the reason — the
+          adjudicating model's own words, not a generic label. */}
+      {s.rationale && s.verdict !== "SUPPORTED" && s.verdict !== "RHETORICAL" ? (
+        <p
+          className={cn(
+            "mt-1.5 border-l-2 pl-2 text-xs leading-snug",
+            blocked ? "border-red-300 text-red-700 dark:text-red-300" : "border-line text-muted",
+          )}
+        >
+          {s.rationale}
+        </p>
+      ) : null}
       <div className="mt-2 flex items-center gap-2">
         {s.verdict && <VerdictBadge verdict={s.verdict} confidence={s.confidence} />}
         {s.claim_ids?.length ? (

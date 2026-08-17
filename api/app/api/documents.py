@@ -113,9 +113,17 @@ def get_claims(document_id: str, db: Session = Depends(get_db)) -> list[Claim]:
 
 @router.get("/{document_id}/pages/{page}.png")
 def get_page_image(
-    document_id: str, page: int, bbox: str | None = None, db: Session = Depends(get_db)
+    document_id: str,
+    page: int,
+    bbox: str | None = None,
+    zoom: float = 2.0,
+    db: Session = Depends(get_db),
 ) -> Response:
-    """Render a source PDF page as PNG, optionally highlighting a cited span (x0,y0,x1,y1)."""
+    """Render a source PDF page as PNG, optionally highlighting a cited span (x0,y0,x1,y1).
+
+    `zoom` (1–4) sets the render resolution; the review UI raises it when the
+    reviewer magnifies, so small print resolves instead of blurring.
+    """
     if db.get(Document, document_id) is None:
         raise HTTPException(status_code=404, detail="document not found")
     box: list[float] | None = None
@@ -130,7 +138,7 @@ def get_page_image(
     from app.ingestion.pageimage import render_page_png
 
     try:
-        png = render_page_png(document_id, page, box)
+        png = render_page_png(document_id, page, box, zoom)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "max-age=3600"})
