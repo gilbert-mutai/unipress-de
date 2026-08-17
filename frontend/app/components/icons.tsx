@@ -82,3 +82,22 @@ export const Spinner = (p: P) => (
     <path d="M21 12a9 9 0 1 1-6.2-8.5" />
   </svg>
 );
+
+export const Plus = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </svg>
+);
+
+export const Minus = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M5 12h14" />
+  </svg>
+);
+
+export const ChevronDown = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);

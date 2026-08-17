@@ -48,6 +48,22 @@ def test_page_image_renders_png(client: TestClient) -> None:
     assert r.content[:8] == b"\x89PNG\r\n\x1a\n"  # PNG magic bytes
 
 
+def test_page_image_zoom_yields_a_larger_render(client: TestClient) -> None:
+    """The review UI raises zoom when magnifying, so detail must actually increase."""
+    data = make_pdf(["1. Introduction\n\n" + KNOWN_SENTENCE])
+    doc = client.post("/documents", files={"file": ("p.pdf", data, "application/pdf")}).json()
+    base = client.get(f"/documents/{doc['id']}/pages/1.png")
+    high = client.get(f"/documents/{doc['id']}/pages/1.png", params={"zoom": 4})
+    assert base.status_code == high.status_code == 200
+    assert len(high.content) > len(base.content)
+
+    # Out-of-range values are clamped, not rejected — a stray value must never
+    # break the panel or let a caller demand an enormous render.
+    huge = client.get(f"/documents/{doc['id']}/pages/1.png", params={"zoom": 99})
+    assert huge.status_code == 200
+    assert len(huge.content) == len(high.content)
+
+
 def test_page_image_bad_bbox(client: TestClient) -> None:
     data = make_pdf(["hello world one two three four five six seven eight nine ten"])
     doc = client.post("/documents", files={"file": ("p.pdf", data, "application/pdf")}).json()

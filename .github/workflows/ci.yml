@@ -85,3 +85,58 @@ jobs:
       # failing the build if a headline metric regresses past the docs/05 §6 bars.
       - name: Eval-gate (synthetic fixture)
         run: uv run python ../eval/run_eval.py --synthetic --fail-on-target-miss --label ci
+
+  # Production deploy, only from master and only once every gate above is green.
+  # Requires four repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
+  # (a private key whose public half is in the server's authorized_keys) and
+  # DEPLOY_KNOWN_HOSTS (`ssh-keyscan -H <host>` output, so the host key is pinned
+  # rather than blindly accepted).
+  deploy:
+    name: deploy (production)
+    needs: [backend, frontend, eval-gate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45 # a cold rebuild of every image is slow but bounded
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false # never interrupt a half-finished deploy
+    environment:
+      name: production
+      url: https://unipress.gilbertmutai.com
+    steps:
+      - name: Authorise SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      # Deploy the commit that triggered this run, not "whatever master is now",
+      # so a push landing mid-deploy cannot be shipped untested. reset --hard is
+      # safe because the server holds no local edits; anything uncommitted there
+      # would be a mistake, and this surfaces it rather than merging around it.
+      - name: Deploy ${{ github.sha }}
+        run: |
+          ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "set -euo pipefail
+             cd /opt/unipress-de
+             git fetch --prune origin
+             git checkout -B master --track origin/master 2>/dev/null || git checkout master
+             git reset --hard ${{ github.sha }}
+             DOMAIN=unipress.gilbertmutai.com ops/deploy.sh --no-pull"
+
+      # deploy.sh already verifies from inside the network; this is the outside
+      # view, which is the one that matters to a visitor.
+      - name: Verify the public edge
+        run: |
+          set -euo pipefail
+          for path in / /api/health /api/docs; do
+            code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 20 \
+              "https://unipress.gilbertmutai.com${path}")
+            echo "  ${path} -> ${code}"
+          done
+          # The served page must point at /api, not a baked-in localhost.
+          curl -fsS --max-time 20 https://unipress.gilbertmutai.com/ | grep -q 'href="/api/' \
+            || { echo "::error::frontend was not built for single origin"; exit 1; }
