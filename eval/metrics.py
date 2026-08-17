@@ -12,6 +12,7 @@ when a frozen gold set is supplied — see ``eval/gold/`` and ``run_eval.py``.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 FACTUAL_ROLES = {"FACT", "INTERPRETATION"}
@@ -61,7 +62,9 @@ def faithfulness(sentences: list[Sentence]) -> float:
     Reuses the TrustLayer's per-sentence confidence (the NLI + judge + overlap
     blend) rather than a second RAGAS pass — same signal, no extra LLM spend.
     """
-    scored = [s["confidence"] for s in factual_sentences(sentences) if s.get("confidence") is not None]
+    scored = [
+        s["confidence"] for s in factual_sentences(sentences) if s.get("confidence") is not None
+    ]
     if not scored:
         return 0.0
     return sum(scored) / len(scored)
@@ -85,35 +88,73 @@ def evidence_link_validity(sentences: list[Sentence], valid_claim_keys: set[str]
     return ok / len(factual)
 
 
-def _flesch(text: str, language: str) -> float:
-    """Flesch reading ease. EN via textstat; HU via a sentence-length heuristic."""
+_VOWEL_RUN = re.compile(r"[aeiouy]+")
+
+
+def _syllables(word: str) -> int:
+    """Vowel-group syllable estimate — the classic offline approximation."""
+    w = word.lower().strip("'\".,;:!?()[]")
+    if not w:
+        return 0
+    count = len(_VOWEL_RUN.findall(w))
+    if w.endswith("e") and count > 1 and not w.endswith(("le", "ee", "ye")):
+        count -= 1  # silent terminal e
+    return max(1, count)
+
+
+def _flesch_offline(text: str) -> float:
+    """Flesch reading ease computed without any downloaded corpus."""
+    sentences = [s for s in re.split(r"[.!?]+", text) if s.strip()]
+    words = [w for w in text.split() if any(c.isalpha() for c in w)]
+    if not sentences or not words:
+        return 0.0
+    wps = len(words) / len(sentences)
+    spw = sum(_syllables(w) for w in words) / len(words)
+    return max(0.0, min(100.0, 206.835 - 1.015 * wps - 84.6 * spw))
+
+
+def _flesch(text: str, language: str) -> tuple[float, str]:
+    """Flesch reading ease with the method that produced it.
+
+    The method is reported so a run made without the corpus is never mistaken
+    for one made with it.
+    """
     text = text.strip()
     if not text:
-        return 0.0
+        return 0.0, "empty"
     if language == "en":
         import textstat
 
-        return float(textstat.flesch_reading_ease(text))
+        try:
+            return float(textstat.flesch_reading_ease(text)), "flesch"
+        except LookupError:
+            # textstat counts English syllables through NLTK's cmudict corpus,
+            # which it downloads at runtime. An offline or network-restricted
+            # environment (CI) cannot fetch it, and a readability metric must not
+            # fail the eval gate over a missing optional corpus. The offline
+            # estimate uses the same Flesch formula with vowel-group syllables,
+            # so values stay on the same scale — close, not identical.
+            return _flesch_offline(text), "flesch_offline"
     # HU: textstat's English syllable model doesn't transfer. Approximate ease from
     # mean words-per-sentence (shorter sentences read easier) — labelled a heuristic.
     sentences = [s for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
     words = text.split()
     if not sentences or not words:
-        return 0.0
+        return 0.0, "hu_heuristic"
     wps = len(words) / len(sentences)
-    return max(0.0, min(100.0, 110.0 - 3.0 * wps))
+    return max(0.0, min(100.0, 110.0 - 3.0 * wps)), "hu_heuristic"
 
 
 def readability(sentences: list[Sentence], language: str, output_type: str) -> dict[str, Any]:
     """Reading ease of the output body + whether it clears the type's target band."""
     body = " ".join(s.get("text", "") for s in sentences if s.get("text"))
-    ease = _flesch(body, language)
+    ease, method = _flesch(body, language)
     floor = READABILITY_FLOOR.get(output_type, _DEFAULT_FLOOR)
     return {
         "reading_ease": round(ease, 1),
         "target_floor": floor,
         "band_hit": ease >= floor,
-        "method": "flesch" if language == "en" else "hu_heuristic",
+        "method": method,
     }
 
 
@@ -160,13 +201,7 @@ def quality_score(
         total = 0.35 + 0.25 + 0.10 + 0.10
         blend = (0.35 * faith + 0.25 * (1 - halluc) + 0.10 * evidence + 0.10 * read) / total
     else:
-        blend = (
-            0.35 * faith
-            + 0.25 * (1 - halluc)
-            + 0.20 * cov
-            + 0.10 * evidence
-            + 0.10 * read
-        )
+        blend = 0.35 * faith + 0.25 * (1 - halluc) + 0.20 * cov + 0.10 * evidence + 0.10 * read
     return round(100 * max(0.0, min(1.0, blend)), 1)
 
 
@@ -184,4 +219,9 @@ def adversarial_caught(results: list[dict[str, Any]]) -> dict[str, Any]:
             caught += 1
         else:
             missed.append(r.get("id"))
-    return {"caught_rate": caught / len(results), "caught": caught, "total": len(results), "missed": missed}
+    return {
+        "caught_rate": caught / len(results),
+        "caught": caught,
+        "total": len(results),
+        "missed": missed,
+    }

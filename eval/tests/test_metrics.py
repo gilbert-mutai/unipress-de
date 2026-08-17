@@ -5,10 +5,20 @@ from __future__ import annotations
 import metrics
 
 
-def _s(role: str, verdict: str | None = None, conf: float | None = None,
-       claims: list[str] | None = None, text: str = "x") -> dict:
-    return {"role": role, "verdict": verdict, "confidence": conf,
-            "claim_ids": claims or [], "text": text}
+def _s(
+    role: str,
+    verdict: str | None = None,
+    conf: float | None = None,
+    claims: list[str] | None = None,
+    text: str = "x",
+) -> dict:
+    return {
+        "role": role,
+        "verdict": verdict,
+        "confidence": conf,
+        "claim_ids": claims or [],
+        "text": text,
+    }
 
 
 def test_hallucination_rate_counts_unsupported_and_contradicted() -> None:
@@ -31,7 +41,11 @@ def test_claim_precision_supported_over_factual() -> None:
 
 
 def test_faithfulness_is_mean_confidence_of_factual() -> None:
-    sents = [_s("FACT", "SUPPORTED", 0.8), _s("FACT", "SUPPORTED", 0.6), _s("RHETORICAL", None, 0.0)]
+    sents = [
+        _s("FACT", "SUPPORTED", 0.8),
+        _s("FACT", "SUPPORTED", 0.6),
+        _s("RHETORICAL", None, 0.0),
+    ]
     assert metrics.faithfulness(sents) == 0.7
 
 
@@ -60,14 +74,16 @@ def test_coverage_matches_cited_key_facts() -> None:
 
 
 def test_quality_score_redistributes_weight_without_coverage() -> None:
-    perfect = metrics.quality_score(faith=1.0, halluc=0.0, cov=None, evidence=1.0,
-                                    readability_band_hit=True)
+    perfect = metrics.quality_score(
+        faith=1.0, halluc=0.0, cov=None, evidence=1.0, readability_band_hit=True
+    )
     assert perfect == 100.0
 
 
 def test_quality_score_penalizes_hallucination() -> None:
-    q = metrics.quality_score(faith=0.5, halluc=0.5, cov=None, evidence=1.0,
-                              readability_band_hit=False)
+    q = metrics.quality_score(
+        faith=0.5, halluc=0.5, cov=None, evidence=1.0, readability_band_hit=False
+    )
     assert 0.0 <= q < 100.0
 
 
@@ -79,3 +95,23 @@ def test_adversarial_caught_rate() -> None:
     out = metrics.adversarial_caught(res)
     assert out["caught_rate"] == 0.5
     assert out["missed"] == ["adv2"]
+
+
+def test_readability_survives_a_missing_nltk_corpus(monkeypatch) -> None:
+    """textstat downloads NLTK's cmudict at runtime; offline CI cannot fetch it.
+
+    A missing optional corpus must not fail the eval gate, and the report must
+    say which method produced the number.
+    """
+    import textstat
+
+    def _no_corpus(*a: object, **k: object) -> float:
+        raise LookupError("Resource 'cmudict' not found.")
+
+    monkeypatch.setattr(textstat, "flesch_reading_ease", _no_corpus)
+    r = metrics.readability(
+        [_s("FACT", text="The cat sat on the mat. The dog ran fast.")], "en", "SOCIAL"
+    )
+    assert r["method"] == "flesch_offline"
+    assert r["band_hit"] is True
+    assert 0.0 <= r["reading_ease"] <= 100.0
