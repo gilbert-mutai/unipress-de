@@ -87,10 +87,12 @@ jobs:
         run: uv run python ../eval/run_eval.py --synthetic --fail-on-target-miss --label ci
 
   # Production deploy, only from master and only once every gate above is green.
-  # Requires four repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
-  # (a private key whose public half is in the server's authorized_keys) and
-  # DEPLOY_KNOWN_HOSTS (`ssh-keyscan -H <host>` output, so the host key is pinned
-  # rather than blindly accepted).
+  # Requires three repository secrets: DEPLOY_HOST, DEPLOY_USER and DEPLOY_SSH_KEY
+  # (a passphrase-less private key whose public half is in the server's
+  # authorized_keys). The host key is pinned from ops/known_hosts, which is
+  # checked into the repo — host keys are public, and keeping them in a file makes
+  # the pin reviewable and immune to the host-string mismatch that fails silently
+  # when a hashed secret was scanned for a different name than the one dialled.
   deploy:
     name: deploy (production)
     needs: [backend, frontend, eval-gate]
@@ -104,13 +106,24 @@ jobs:
       name: production
       url: https://unipress.gilbertmutai.com
     steps:
+      - uses: actions/checkout@v4 # for ops/known_hosts
+
       - name: Authorise SSH
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
+          set -euo pipefail
+          test -n "$HOST" || { echo "::error::DEPLOY_HOST secret is empty"; exit 1; }
           install -d -m 700 ~/.ssh
           printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/id_ed25519 -P "" >/dev/null 2>&1 \
+            || { echo "::error::DEPLOY_SSH_KEY is unusable — truncated, or passphrase-protected (CI cannot type a passphrase)"; exit 1; }
+          install -m 644 ops/known_hosts ~/.ssh/known_hosts
+          # Fail with the reason rather than ssh's bare "Host key verification failed".
+          ssh-keygen -F "$HOST" -f ~/.ssh/known_hosts >/dev/null \
+            || { echo "::error::No pinned host key for '$HOST'. ops/known_hosts covers: $(grep -v '^#' ops/known_hosts | awk '{print $1}' | sort -u | tr '\n' ' '). Re-run ssh-keyscan for that exact name and commit it."; exit 1; }
+          echo "  host key pinned for $HOST"
 
       # Deploy the commit that triggered this run, not "whatever master is now",
       # so a push landing mid-deploy cannot be shipped untested. reset --hard is
