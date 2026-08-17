@@ -48,7 +48,16 @@ if ((BUILD)); then
     # needs a real image rebuild — `up -d` alone would keep serving the old
     # bundle. Image IDs are recorded either side of the build so a rebuild that
     # silently changed nothing is visible rather than assumed.
-    before="$(docker compose images -q frontend api 2>/dev/null | sort | tr '\n' ' ')"
+    # Inspect the image *tags*, not `compose images`: the latter reports what each
+    # running container is using and exits non-zero once a rebuild has replaced an
+    # image out from under a live container ("No such image: sha256:…") — which is
+    # every deploy that changes anything. Under `set -e` that turned this
+    # diagnostic into a deploy failure right after a successful build.
+    image_ids() {
+        docker image inspect -f '{{.Id}}' unipress-de-frontend unipress-de-api 2>/dev/null |
+            sort | tr '\n' ' ' || true
+    }
+    before="$(image_ids)"
     if ((NOCACHE)); then
         echo "→ Building images (--no-cache)"
         docker compose build --no-cache
@@ -56,8 +65,11 @@ if ((BUILD)); then
         echo "→ Building images"
         docker compose build
     fi
-    after="$(docker compose images -q frontend api 2>/dev/null | sort | tr '\n' ' ')"
-    if [[ $before == "$after" ]]; then
+    after="$(image_ids)"
+    # Informational only — never fail the deploy over it.
+    if [[ -z $before || -z $after ]]; then
+        echo "  (could not compare image ids)"
+    elif [[ $before == "$after" ]]; then
         echo "  (frontend/api images unchanged — no code change, or a stale cache)"
     else
         echo "  frontend/api images rebuilt"
