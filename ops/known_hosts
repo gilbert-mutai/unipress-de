@@ -1,0 +1,14 @@
+# Pinned SSH host keys for the production VM (docs/09, ops/deploy.sh).
+#
+# Public keys, not secrets — kept in the repo so the pin is reviewable in a
+# diff rather than hidden in a CI secret nobody can inspect. Both the IP and
+# the hostname are listed, because a hashed entry only matches the exact
+# string used to connect, and that mismatch is what failed the first deploy.
+#
+# Regenerate after a VM rebuild:  ssh-keyscan -t rsa,ecdsa,ed25519 <host>
+41.242.3.37 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsKa3g7YoL7olz85tF2hQznSEN4X/bpmthuhENXjPTqhM1tZaWVjqbOX+F6lPUxsCYzL3rrIvcLaJdtoCfboD9eD0oKt7f/zeWZdMQMrnIXbh2PWGoH1rUWya5kRXiVhOTzm8LmnALbxGSHhk2s+nwHeAem/i3gu1wH63sjqMV6bXZlDgdb0V1ml/An9ACGXBK83zJ9ZdWW1J/6ROUK2d1nv/ZC3rPyd5Pnor18tHdlXS2jzWIFbO9XoPq932ZCynET6KK/ahoPVGXkBU/gzwfaD+vQaZphiaY5nLH/dLlKdtwOT8TR+TvnBcwnOHkjvi2cxIpcnMtPQqqh1qeE7/blnAFFuUgCIcVhLVmEtGzJdOXH4q5N6d1K7WLRFwp5BtD6BhB4k7EWAjRYmf/duuRgB6lhOpECzbtTe9CJPD8MDnFSNK2Xz/q/6Gt9z9Y5LbVVy6T29FCNHKbRNq3Kq5O2idbsiJ38PDKaoluYYEvfiVSSvwnBNF+gVCv5BfsAxc=
+41.242.3.37 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJh2qLDhZJmKnC7gLPnsRtOSCFJz+AAx2VmXUnibaIrd5Nzv6tiXL87GnGWA4z5Lv8dK0TES1u2NS5V9OXCpQFY=
+41.242.3.37 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX3MkXvDom68qNo/MfT2XK4ltrRIwrCULL/8dHPtgx6
+unipress.gilbertmutai.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX3MkXvDom68qNo/MfT2XK4ltrRIwrCULL/8dHPtgx6
+unipress.gilbertmutai.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsKa3g7YoL7olz85tF2hQznSEN4X/bpmthuhENXjPTqhM1tZaWVjqbOX+F6lPUxsCYzL3rrIvcLaJdtoCfboD9eD0oKt7f/zeWZdMQMrnIXbh2PWGoH1rUWya5kRXiVhOTzm8LmnALbxGSHhk2s+nwHeAem/i3gu1wH63sjqMV6bXZlDgdb0V1ml/An9ACGXBK83zJ9ZdWW1J/6ROUK2d1nv/ZC3rPyd5Pnor18tHdlXS2jzWIFbO9XoPq932ZCynET6KK/ahoPVGXkBU/gzwfaD+vQaZphiaY5nLH/dLlKdtwOT8TR+TvnBcwnOHkjvi2cxIpcnMtPQqqh1qeE7/blnAFFuUgCIcVhLVmEtGzJdOXH4q5N6d1K7WLRFwp5BtD6BhB4k7EWAjRYmf/duuRgB6lhOpECzbtTe9CJPD8MDnFSNK2Xz/q/6Gt9z9Y5LbVVy6T29FCNHKbRNq3Kq5O2idbsiJ38PDKaoluYYEvfiVSSvwnBNF+gVCv5BfsAxc=
+unipress.gilbertmutai.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJh2qLDhZJmKnC7gLPnsRtOSCFJz+AAx2VmXUnibaIrd5Nzv6tiXL87GnGWA4z5Lv8dK0TES1u2NS5V9OXCpQFY=
