@@ -94,10 +94,56 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function uploadDocument(file: File): Promise<DocumentRead> {
+/** Upload a PDF, reporting transfer progress (0–1) when the browser can measure it.
+ *
+ * Uses XMLHttpRequest rather than fetch: fetch cannot report *upload* progress, and
+ * on a slow link the transfer is the whole wait — a 2.5 MB paper took 12–57s from
+ * Europe to this host, against ~0.15s of server-side work. Without progress the
+ * screen simply sits there, which is the worst thing it can do in a demo.
+ */
+export function uploadDocument(
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<DocumentRead> {
   const form = new FormData();
   form.append("file", file);
-  return json(await fetch(`${API_BASE}/documents`, { method: "POST", body: form }));
+
+  return new Promise<DocumentRead>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}/documents`);
+    xhr.responseType = "text";
+
+    xhr.upload.onprogress = (e) => {
+      // lengthComputable is false for chunked encoding; leave the caller to show
+      // an indeterminate state rather than inventing a number.
+      if (e.lengthComputable && e.total > 0) onProgress?.(e.loaded / e.total);
+    };
+    // The bytes are gone but the server has yet to answer: hold at 100% so the
+    // caller can switch to "processing" instead of appearing stuck mid-bar.
+    xhr.upload.onload = () => onProgress?.(1);
+
+    xhr.onload = () => {
+      let body: unknown;
+      try {
+        body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        body = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(body as DocumentRead);
+      } else {
+        const detail =
+          body && typeof body === "object" && "detail" in body
+            ? String((body as { detail: unknown }).detail)
+            : `${xhr.status} ${xhr.statusText}`;
+        reject(new Error(detail));
+      }
+    };
+    xhr.onerror = () =>
+      reject(new Error("Upload failed — the connection dropped or timed out."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+    xhr.send(form);
+  });
 }
 
 export async function getDocument(id: string): Promise<DocumentRead> {
