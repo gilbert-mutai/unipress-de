@@ -34,6 +34,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // The chosen file, held while it uploads — the document does not exist yet.
+  const [pending, setPending] = useState<{ name: string; size: number } | null>(null);
+  const [sent, setSent] = useState(0); // fraction of bytes transferred, 0–1
   const [outputType, setOutputType] = useState("PRESS_RELEASE");
   const [language, setLanguage] = useState("en");
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -44,11 +47,18 @@ export default function Home() {
     setOutput(null);
     setError(null);
     setBusy(true);
+    // Acknowledge the choice before the first byte leaves: on a slow uplink the
+    // transfer is tens of seconds, and with no feedback the page looks broken.
+    setPending({ name: file.name, size: file.size });
+    setSent(0);
     try {
-      setDoc(await uploadDocument(file));
+      const uploaded = await uploadDocument(file, setSent);
+      setDoc(uploaded);
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
       setBusy(false);
+    } finally {
+      setPending(null);
     }
   }
 
@@ -111,8 +121,10 @@ export default function Home() {
     }
   }, [doc, outputType, language]);
 
-  const uploadTitle = doc ? "Source paper" : "Upload a paper";
-  const uploadHint = !doc
+  const uploadTitle = doc || pending ? "Source paper" : "Upload a paper";
+  const uploadHint = pending && !doc
+    ? "Sending the file to the server…"
+    : !doc
     ? "A research paper in PDF format."
     : doc.status === "done"
       ? "Extracted into a verified claim store."
@@ -143,7 +155,35 @@ export default function Home() {
       <Card className="animate-fade-up">
         <CardBody>
           <StepHeading n={1} title={uploadTitle} hint={uploadHint} />
-          {!doc ? (
+          {pending && !doc ? (
+            <div className="mt-4 animate-fade-in">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-muted" />
+                <span className="font-medium">{pending.name}</span>
+                <span className="text-sm text-muted">{formatSize(pending.size)}</span>
+                <span className="ml-auto text-sm tabular-nums text-muted">
+                  {/* Once the bytes are all sent the wait is the server's, not the
+                      network's — say so rather than sitting at 100%. */}
+                  {sent >= 1 ? "Preparing…" : `Uploading ${Math.round(sent * 100)}%`}
+                </span>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
+                <div
+                  className={cn(
+                    "h-full rounded-full bg-brand transition-[width] duration-200",
+                    sent >= 1 && "animate-pulse",
+                  )}
+                  style={{ width: `${Math.max(2, Math.round(sent * 100))}%` }}
+                />
+              </div>
+              {pending.size > 2_000_000 && sent < 1 && (
+                <p className="mt-2 text-xs text-muted">
+                  {formatSize(pending.size)} over a slow connection can take a minute — a
+                  smaller paper uploads in seconds.
+                </p>
+              )}
+            </div>
+          ) : !doc ? (
             <label
               onDragOver={(e) => {
                 e.preventDefault();
@@ -244,6 +284,11 @@ export default function Home() {
       )}
     </main>
   );
+}
+
+function formatSize(bytes: number): string {
+  const mb = bytes / 1_000_000;
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1000))} KB`;
 }
 
 function StepHeading({ n, title, hint }: { n: number; title: string; hint: string }) {
