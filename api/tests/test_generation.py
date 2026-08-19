@@ -171,3 +171,25 @@ def test_role_name_as_sentence_text_is_dropped() -> None:
     # "Rhetorical." and "  fact:  " all carry no content.
     assert [s.text for s in out.sentences] == ["A real sentence."]
     assert out.title_claim_ids == ["clm_001"]
+
+
+def test_generation_reports_real_progress(client: TestClient) -> None:
+    """Progress must come from the work: monotonic, ending at 100, naming each phase."""
+    from app.generation.service import generate_output
+    from tests.test_ingestion import make_pdf
+
+    doc_id = client.post(
+        "/documents", files={"file": ("p.pdf", make_pdf([PAPER]), "application/pdf")}
+    ).json()["id"]
+
+    seen: list[tuple[int, str]] = []
+    generate_output(doc_id, "PRESS_RELEASE", "en", on_progress=lambda p, d: seen.append((p, d)))
+
+    assert seen, "expected progress reports"
+    percents = [p for p, _ in seen]
+    assert percents == sorted(percents), f"progress went backwards: {percents}"
+    assert percents[0] <= 10 and percents[-1] >= 85
+    # The per-sentence phase is the slow half, so it must be reported per sentence.
+    checked = [d for _, d in seen if d.startswith("checking sentence ")]
+    assert len(checked) >= 2, f"expected per-sentence reports, got {[d for _, d in seen]}"
+    assert "of" in checked[-1]

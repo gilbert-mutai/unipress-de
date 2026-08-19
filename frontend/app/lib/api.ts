@@ -36,6 +36,9 @@ export interface JobRead {
   stage: string;
   result: string | null;
   error: string | null;
+  /** Worker-reported completion, 0–100, and the phase it is in. */
+  progress?: number | null;
+  detail?: string | null;
 }
 
 export type Verdict =

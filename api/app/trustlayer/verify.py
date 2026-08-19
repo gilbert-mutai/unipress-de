@@ -17,6 +17,7 @@ INTERPRETATION.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.core.settings import get_settings
@@ -128,12 +129,23 @@ def _assess(
     )
 
 
-def verify_output(output: GeneratedOutput, claims_by_key: dict[str, ClaimEvidence]) -> None:
-    """Mutate each sentence — and the title — with a verdict, confidence, rationale."""
+def verify_output(
+    output: GeneratedOutput,
+    claims_by_key: dict[str, ClaimEvidence],
+    on_sentence: Callable[[], None] | None = None,
+) -> None:
+    """Mutate each sentence — and the title — with a verdict, confidence, rationale.
+
+    `on_sentence` fires after each sentence so a caller can report progress: with
+    the Tier-2 judge enabled this loop makes a model call per gated sentence and is
+    often the slowest part of generating an output.
+    """
     for sentence in output.sentences:
         if not sentence.is_factual:
             sentence.verdict = Verdict.RHETORICAL
             sentence.confidence = None
+            if on_sentence:
+                on_sentence()  # counts toward progress: the caller sized the work by sentences
             continue
         a = _assess(
             sentence.text,
@@ -146,6 +158,8 @@ def verify_output(output: GeneratedOutput, claims_by_key: dict[str, ClaimEvidenc
             a.confidence,
             a.rationale,
         )
+        if on_sentence:
+            on_sentence()
 
     if output.title:
         a = _assess(output.title, output.title_claim_ids, claims_by_key, soften=False)
