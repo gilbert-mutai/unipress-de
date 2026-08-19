@@ -158,5 +158,11 @@ class SentenceRecord(Base):
     verdict: Mapped[str | None] = mapped_column(String(20), nullable=True)
     confidence: Mapped[float | None] = mapped_column(nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The reviewer's ruling: "accepted" | "flagged", NULL until they decide.
+    # Drives the publish render, which is what makes the human the last gate.
+    decision: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # A rewrite, kept beside the original rather than replacing it: what the model
+    # wrote and how it scored stays auditable next to what was published.
+    edited_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     output: Mapped[OutputRecord] = relationship(back_populates="sentences")

@@ -1,0 +1,62 @@
+{# The deliverable: text as it should go out. No verdicts, no claim ids, no
+   coverage warnings — those belong to the evidence record (output.html), which is
+   for sign-off. Attribution stays, because the licence requires it and a
+   newsroom needs the source. #}
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title }}</title>
+  <style>
+    body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; max-width: 46rem;
+           margin: 2rem auto; line-height: 1.6; padding: 0 1rem; }
+    h1 { font-size: 1.7rem; line-height: 1.25; margin-bottom: .3rem; }
+    .kicker { text-transform: uppercase; letter-spacing: .06em; font-size: .7rem;
+              color: #666; font-family: system-ui, sans-serif; margin-bottom: 1.4rem; }
+    p { margin: .7rem 0; }
+    .section-label { text-transform: uppercase; letter-spacing: .05em; font-size: .68rem;
+                     color: #999; font-family: system-ui, sans-serif; margin: 1.4rem 0 .2rem; }
+    footer { margin-top: 2.4rem; padding-top: 1rem; border-top: 1px solid #ddd;
+             font-family: system-ui, sans-serif; font-size: .72rem; color: #555; }
+    table.scenes { width:100%; border-collapse:collapse; font-family:system-ui,sans-serif; font-size:.85rem; }
+    table.scenes th { text-align:left; text-transform:uppercase; letter-spacing:.05em; font-size:.62rem;
+                      color:#888; border-bottom:1px solid #ddd; padding:.4rem .5rem; }
+    table.scenes td { border-bottom:1px solid #eee; padding:.6rem .5rem; vertical-align:top; }
+    table.scenes .tc { font-variant-numeric:tabular-nums; white-space:nowrap; font-weight:600; }
+    table.scenes .os { color:#7a5a00; }
+    table.scenes .vis { color:#666; font-style:italic; }
+  </style>
+</head>
+<body>
+  <div class="kicker">{{ output_type|replace("_", " ") }} · {{ language|upper }}</div>
+  <h1>{{ title }}</h1>
+
+  {% if is_video %}
+  <table class="scenes">
+    <thead>
+      <tr><th>Time</th><th>Narration</th><th>On screen</th><th>Visual</th></tr>
+    </thead>
+    <tbody>
+      {% for s in scenes %}
+      <tr>
+        <td class="tc">{{ s.timecode or "" }}</td>
+        <td>{{ s.text }}</td>
+        <td class="os">{{ s.on_screen or "" }}</td>
+        <td class="vis">{{ s.visual or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    {% for section, group in sections %}
+      {% if section %}<div class="section-label">{{ section|replace("_", " ") }}</div>{% endif %}
+      {% for s in group %}<p>{{ s.text }}</p>{% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  <footer>
+    {{ attribution }}
+    <br />Prepared with UniPress DE — every statement was checked against the source before release.
+  </footer>
+</body>
+</html>

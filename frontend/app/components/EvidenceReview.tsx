@@ -1,7 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClaimRead, OutputDetail, pageImageUrl, renderUrl, SentenceRead } from "../lib/api";
+import {
+  ClaimRead,
+  Decision,
+  OutputDetail,
+  pageImageUrl,
+  renderUrl,
+  reviewSentence,
+  SentenceRead,
+} from "../lib/api";
+import { copyDeliverable, socialLength, withDecisions } from "../lib/deliverable";
 import { cn } from "../lib/utils";
 import {
   AlertTriangle,
@@ -9,6 +18,7 @@ import {
   ChevronDown,
   Download,
   ExternalLink,
+  Copy,
   Flag,
   Minus,
   Plus,
@@ -28,8 +38,14 @@ export default function EvidenceReview({
   const [selected, setSelected] = useState<number | null>(
     output.sentences.find((s) => s.claim_ids?.length)?.order_index ?? null,
   );
-  const [accepted, setAccepted] = useState<Set<number>>(new Set());
-  const [flagged, setFlagged] = useState<Set<number>>(new Set());
+  // Decisions live on the server now; this mirrors them so the UI stays instant.
+  const [decisions, setDecisions] = useState<Record<number, Decision>>(() =>
+    Object.fromEntries(
+      output.sentences.filter((s) => s.decision).map((s) => [s.order_index, s.decision as Decision]),
+    ),
+  );
+  const [copied, setCopied] = useState<"text" | "cited" | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   // An omitted claim has no sentence to select, so the evidence panel can also be
   // focused on a claim key directly — that is how a reviewer inspects what was
@@ -55,10 +71,54 @@ export default function EvidenceReview({
     return rows;
   }, [output.coverage, claimsByKey]);
 
-  const toggle = (set: Set<number>, i: number, set2: (s: Set<number>) => void) => {
-    const next = new Set(set);
-    next.has(i) ? next.delete(i) : next.add(i);
-    set2(next);
+  const counts = useMemo(
+    () => ({
+      accepted: Object.values(decisions).filter((d) => d === "accepted").length,
+      flagged: Object.values(decisions).filter((d) => d === "flagged").length,
+    }),
+    [decisions],
+  );
+
+  // The published copy reflects decisions, so the count updates with them.
+  const chars = useMemo(
+    () => socialLength({ ...output, sentences: withDecisions(output.sentences, decisions) }),
+    [output, decisions],
+  );
+
+  /** Toggle a ruling, optimistically — then persist it. */
+  const rule = async (orderIndex: number, want: Decision) => {
+    const next = decisions[orderIndex] === want ? null : want;
+    setDecisions((d) => {
+      const copy = { ...d };
+      if (next) copy[orderIndex] = next;
+      else delete copy[orderIndex];
+      return copy;
+    });
+    try {
+      await reviewSentence(output.id, orderIndex, { decision: next });
+    } catch {
+      // Roll back rather than show a decision that was not saved: the export
+      // obeys the server, so a silent divergence would publish the wrong text.
+      setDecisions((d) => {
+        const copy = { ...d };
+        const before = decisions[orderIndex];
+        if (before) copy[orderIndex] = before;
+        else delete copy[orderIndex];
+        return copy;
+      });
+      setSaveError("Could not save that decision — check the connection and try again.");
+    }
+  };
+
+  const copy = async (withCitations: boolean) => {
+    const shaped = { ...output, sentences: withDecisions(output.sentences, decisions) };
+    try {
+      await copyDeliverable(shaped, withCitations);
+      setCopied(withCitations ? "cited" : "text");
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setSaveError("Copying failed — your browser blocked clipboard access.");
+    }
   };
 
   const selectedClaims = useMemo(() => {
@@ -146,21 +206,44 @@ export default function EvidenceReview({
         </div>
       ) : null}
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <a href={renderUrl(output.id, "html")} target="_blank" rel="noreferrer">
+      {/* Two purposes, kept apart: what you publish, and what you keep as the
+          record. Offering only the annotated version left no usable output. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <Button variant="accent" size="sm" onClick={() => copy(false)}>
+          <Copy className="h-4 w-4" /> {copied === "text" ? "Copied" : "Copy text"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => copy(true)}>
+          <Copy className="h-4 w-4" />
+          {copied === "cited" ? "Copied" : "Copy with citations"}
+        </Button>
+        <a href={renderUrl(output.id, "pdf", "publish")} target="_blank" rel="noreferrer">
           <Button variant="outline" size="sm">
-            <ExternalLink className="h-4 w-4" /> Open HTML
+            <Download className="h-4 w-4" /> Publish PDF
           </Button>
         </a>
-        <a href={renderUrl(output.id, "pdf")} target="_blank" rel="noreferrer">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4" /> PDF
+        <a href={renderUrl(output.id, "html", "evidence")} target="_blank" rel="noreferrer">
+          <Button variant="ghost" size="sm">
+            <ExternalLink className="h-4 w-4" /> Evidence record
           </Button>
         </a>
         <span className="ml-auto text-sm text-muted">
-          {accepted.size} accepted · {flagged.size} flagged
+          {counts.accepted} accepted · {counts.flagged} flagged
+          {counts.flagged ? " · excluded from the published copy" : ""}
         </span>
       </div>
+
+      {saveError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+          {saveError}
+        </p>
+      )}
+
+      {output.output_type === "SOCIAL" && (
+        <p className="mb-4 text-xs text-muted">
+          {chars} characters — {chars <= 280 ? "fits X" : `${chars - 280} over the X limit`}; well
+          within LinkedIn.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1fr]">
         {/* Left — generated output */}
@@ -198,11 +281,11 @@ export default function EvidenceReview({
                 key={s.order_index}
                 s={s}
                 selected={s.order_index === selected}
-                accepted={accepted.has(s.order_index)}
-                flagged={flagged.has(s.order_index)}
+                accepted={decisions[s.order_index] === "accepted"}
+                flagged={decisions[s.order_index] === "flagged"}
                 onSelect={() => selectSentence(s.order_index)}
-                onAccept={() => toggle(accepted, s.order_index, setAccepted)}
-                onFlag={() => toggle(flagged, s.order_index, setFlagged)}
+                onAccept={() => rule(s.order_index, "accepted")}
+                onFlag={() => rule(s.order_index, "flagged")}
               />
             ))}
           </div>
