@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
-from app.db_models import Chunk, Claim, Document, Job, OutputRecord
+from app.db_models import Chunk, Claim, Document, Job, OutputRecord, SentenceRecord
 from app.models import (
     ChunkRead,
     ClaimRead,
@@ -20,6 +20,8 @@ from app.models import (
     OutputSummary,
     SearchHit,
     SearchQuery,
+    SentenceRead,
+    SentenceReview,
 )
 from app.ports import Storage
 
@@ -253,31 +255,94 @@ def get_output(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
     return output
 
 
+@router.patch("/outputs/{output_id}/sentences/{order_index}", response_model=SentenceRead)
+def review_sentence(
+    output_id: str,
+    order_index: int,
+    payload: SentenceReview,
+    db: Session = Depends(get_db),
+) -> SentenceRecord:
+    """Record the reviewer's ruling on one sentence, and any rewrite.
+
+    The decision is what the publish render obeys, so it has to outlive the browser
+    tab: a flagged sentence that reappears in the exported PDF would make the whole
+    review theatre. An edit is stored beside the original rather than replacing it,
+    keeping the generated text and its verdict auditable.
+    """
+    sentence = db.scalars(
+        select(SentenceRecord).where(
+            SentenceRecord.output_id == output_id,
+            SentenceRecord.order_index == order_index,
+        )
+    ).first()
+    if sentence is None:
+        raise HTTPException(status_code=404, detail="sentence not found")
+
+    # `exclude_unset` so clearing a decision (null) is distinguishable from not
+    # mentioning it: sending {"decision": null} un-decides, omitting it leaves it.
+    fields = payload.model_dump(exclude_unset=True)
+    if "decision" in fields:
+        sentence.decision = fields["decision"]
+    if "edited_text" in fields:
+        edited = (fields["edited_text"] or "").strip()
+        sentence.edited_text = edited or None
+    db.commit()
+    db.refresh(sentence)
+    return sentence
+
+
 @router.get("/outputs/{output_id}/render")
-def render_output(output_id: str, format: str = "html", db: Session = Depends(get_db)) -> Response:
-    """Render an output as HTML (default) or PDF, with evidence trail + attribution."""
+def render_output(
+    output_id: str,
+    format: str = "html",
+    view: str = "evidence",
+    db: Session = Depends(get_db),
+) -> Response:
+    """Render an output as HTML (default) or PDF.
+
+    Two views, because they serve different readers. `evidence` (default, and what
+    existed before) annotates every sentence with its verdict, confidence and cited
+    claims — the record for sign-off. `publish` is the deliverable: flagged
+    sentences dropped, reviewer edits applied, no verdict furniture, attribution
+    kept. Handing a newsroom the annotated version was the reason the tool had no
+    directly usable output.
+    """
     output = db.get(OutputRecord, output_id)
     if output is None:
         raise HTTPException(status_code=404, detail="output not found")
     doc = db.get(Document, output.document_id)
     source_filename = doc.filename if doc else output.title
 
-    from app.outputs.render import render_html
+    if view not in ("evidence", "publish"):
+        raise HTTPException(status_code=400, detail="view must be 'evidence' or 'publish'")
 
+    from app.outputs.render import render_html, render_publish_html
+
+    publish = view == "publish"
     if format == "html":
-        return HTMLResponse(content=render_html(output, source_filename))
+        html = (
+            render_publish_html(output, source_filename)
+            if publish
+            else render_html(output, source_filename)
+        )
+        return HTMLResponse(content=html)
     if format == "pdf":
         try:
-            from app.outputs.render import render_pdf
+            from app.outputs.render import render_pdf, render_publish_pdf
 
-            pdf = render_pdf(output, source_filename)
+            pdf = (
+                render_publish_pdf(output, source_filename)
+                if publish
+                else render_pdf(output, source_filename)
+            )
         except (ImportError, OSError) as exc:  # WeasyPrint system libs missing
             raise HTTPException(
                 status_code=501, detail=f"PDF rendering unavailable: {exc}"
             ) from exc
+        name = f"{output.output_type.lower()}-{output.language}" if publish else output_id
         return Response(
             content=pdf,
             media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{output_id}.pdf"'},
+            headers={"Content-Disposition": f'inline; filename="{name}.pdf"'},
         )
     raise HTTPException(status_code=400, detail="format must be 'html' or 'pdf'")

@@ -60,7 +60,13 @@ export interface SentenceRead {
   verdict: Verdict | null;
   confidence: number | null;
   rationale: string | null;
+  /** The reviewer's ruling; drives what the published copy contains. */
+  decision?: Decision | null;
+  /** A reviewer's rewrite, kept beside the generated text rather than replacing it. */
+  edited_text?: string | null;
 }
+
+export type Decision = "accepted" | "flagged";
 
 export interface Coverage {
   cited: string[];
@@ -179,8 +185,29 @@ export async function getOutput(outputId: string): Promise<OutputDetail> {
   return json(await fetch(`${API_BASE}/documents/outputs/${outputId}`));
 }
 
-export function renderUrl(outputId: string, format: "html" | "pdf"): string {
-  return `${API_BASE}/documents/outputs/${outputId}/render?format=${format}`;
+/** `publish` is the deliverable (flagged sentences dropped, edits applied, no
+ *  verdict furniture); `evidence` is the annotated record for sign-off. */
+export function renderUrl(
+  outputId: string,
+  format: "html" | "pdf",
+  view: "publish" | "evidence" = "evidence",
+): string {
+  return `${API_BASE}/documents/outputs/${outputId}/render?format=${format}&view=${view}`;
+}
+
+/** Record the reviewer's ruling on one sentence so it outlives the tab. */
+export async function reviewSentence(
+  outputId: string,
+  orderIndex: number,
+  body: { decision?: "accepted" | "flagged" | null; edited_text?: string | null },
+): Promise<SentenceRead> {
+  return json(
+    await fetch(`${API_BASE}/documents/outputs/${outputId}/sentences/${orderIndex}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
 }
 
 /** URL of a source page rendered to PNG, with an optional highlighted bbox. */

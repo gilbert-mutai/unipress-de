@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -119,6 +120,21 @@ class SentenceRead(BaseModel):
     verdict: str | None = None
     confidence: float | None = None
     rationale: str | None = None
+    # The reviewer's ruling and any rewrite (see SentenceReview).
+    decision: Literal["accepted", "flagged"] | None = None
+    edited_text: str | None = None
+
+
+class SentenceReview(BaseModel):
+    """A reviewer's ruling on one sentence.
+
+    Both fields are optional and only applied when present, so a client can set a
+    decision without touching an edit — and can clear a decision by sending null,
+    which is distinguishable from omitting it.
+    """
+
+    decision: Literal["accepted", "flagged"] | None = None
+    edited_text: str | None = Field(default=None, max_length=4000)
 
 
 class OutputSummary(BaseModel):
