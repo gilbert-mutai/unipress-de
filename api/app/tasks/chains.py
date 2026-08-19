@@ -126,13 +126,19 @@ def start_ingestion(job_id: str, document_id: str) -> str:
 def task_generate(job_id: str, document_id: str, output_type: str, language: str) -> str:
     from app.generation.service import generate_output
 
-    _set(job_id, status="processing", stage="generate")
+    _set(job_id, status="processing", stage="generate", progress=2, detail="starting")
+
+    # One UPDATE per phase — a handful over a run that lasts tens of seconds, so
+    # the cost is irrelevant beside a model call, and the UI gets a real number.
+    def _report(percent: int, detail: str) -> None:
+        _set(job_id, progress=percent, detail=detail)
+
     try:
-        output_id = generate_output(document_id, output_type, language)
+        output_id = generate_output(document_id, output_type, language, on_progress=_report)
     except Exception as exc:
-        _set(job_id, status="failed", error=str(exc))
+        _set(job_id, status="failed", error=str(exc), detail=None)
         raise
-    _set(job_id, status="done", stage="done", result=output_id)
+    _set(job_id, status="done", stage="done", result=output_id, progress=100, detail=None)
     return job_id
 
 

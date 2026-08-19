@@ -215,6 +215,8 @@ def generate_output(
                 status="done",
                 stage="cached",
                 result=existing.id,
+                progress=100,
+                detail="reused an already-verified output",
             )
             db.add(job)
             db.commit()

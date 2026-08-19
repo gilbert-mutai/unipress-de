@@ -25,6 +25,9 @@ class JobRead(BaseModel):
     document_id: str | None = None
     result: str | None = None
     error: str | None = None
+    # Worker-reported: 0–100 and a short phase ("checking sentence 7 of 12").
+    progress: int | None = None
+    detail: str | None = None
     created_at: datetime
     updated_at: datetime
 

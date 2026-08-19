@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from app.core.db import session_scope
 from app.core.logging import get_logger
 from app.core.metrics import timed_stage
@@ -13,6 +15,9 @@ from app.generation.models import GeneratedOutput, OutputSpec, OutputType
 from app.generation.specs import get_spec
 from app.trustlayer.coverage import coverage_report
 from app.trustlayer.verify import ClaimEvidence, verify_output
+
+# (percent 0-100, short human phase) — reported from the work, not a timer.
+ProgressFn = Callable[[int, str], None]
 
 log = get_logger("generation.service")
 
@@ -45,13 +50,41 @@ def _generate(
 
 
 @timed_stage("generate")
-def generate_output(document_id: str, output_type: str, language: str) -> str:
-    """Generate + verify + persist one output. Returns the output record id."""
+def generate_output(
+    document_id: str,
+    output_type: str,
+    language: str,
+    on_progress: ProgressFn | None = None,
+) -> str:
+    """Generate + verify + persist one output. Returns the output record id.
+
+    `on_progress(percent, detail)` is called as the work proceeds. The two slow
+    parts are the model writing the draft and the TrustLayer checking each
+    sentence, and the latter is reported per sentence — with an LLM judge in the
+    loop it can be the longer half, and a reviewer waiting deserves to see it move.
+    """
+    report = on_progress or (lambda _pct, _detail: None)
+
+    report(8, "reading the claim store")
     spec = get_spec(OutputType(output_type))
     claims, evidence, title_hint = _load_claims(document_id)
 
+    report(18, "writing the draft")
     output = _generate(spec, claims, language, title_hint)
-    verify_output(output, evidence)  # TrustLayer: verdict + confidence per sentence
+
+    # Verification spans 35→85% in step with the sentences actually checked.
+    total = max(1, len(output.sentences))
+    verified = 0
+
+    def _sentence_done() -> None:
+        nonlocal verified
+        verified += 1
+        report(35 + int(50 * verified / total), f"checking sentence {verified} of {total}")
+
+    report(35, f"checking {total} sentences against their sources")
+    verify_output(output, evidence, on_sentence=_sentence_done)
+
+    report(90, "checking for omitted caveats")
     coverage = coverage_report(claims, output)  # document-level: omissions, dropped caveats
 
     with session_scope() as s:

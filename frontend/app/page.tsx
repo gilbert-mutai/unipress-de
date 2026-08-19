@@ -37,6 +37,9 @@ export default function Home() {
   // The chosen file, held while it uploads — the document does not exist yet.
   const [pending, setPending] = useState<{ name: string; size: number } | null>(null);
   const [sent, setSent] = useState(0); // fraction of bytes transferred, 0–1
+  // Worker-reported generation progress, and whether the result was reused.
+  const [gen, setGen] = useState<{ percent: number; detail: string | null } | null>(null);
+  const [reused, setReused] = useState(false);
   const [outputType, setOutputType] = useState("PRESS_RELEASE");
   const [language, setLanguage] = useState("en");
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,18 +109,25 @@ export default function Home() {
     setError(null);
     setBusy(true);
     setOutput(null);
+    setGen({ percent: 2, detail: "starting" });
     try {
       let job = await generateOutput(doc.id, outputType, language);
+      // A reused output comes back already done: say so instead of flashing
+      // "Generating…" for a few hundred milliseconds.
+      if (job.stage === "cached") setGen({ percent: 100, detail: job.detail ?? "reused" });
       while (job.status !== "done" && job.status !== "failed") {
         await new Promise((r) => setTimeout(r, 700));
         job = await getJob(job.id);
+        if (job.progress != null) setGen({ percent: job.progress, detail: job.detail ?? null });
       }
       if (job.status === "failed" || !job.result) throw new Error(job.error ?? "generation failed");
       setOutput(await getOutput(job.result));
+      setReused(job.stage === "cached");
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setGen(null);
     }
   }, [doc, outputType, language]);
 
@@ -260,12 +270,32 @@ export default function Home() {
               <div className="mt-4">
                 <div className="mb-1.5 flex items-center gap-2 text-sm text-ink">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-brand" />
-                  Writing and verifying every sentence against its source…
+                  {/* The phase comes from the worker, so it names the work actually
+                      under way rather than a generic message. */}
+                  {gen?.detail ?? "Writing and verifying every sentence against its source…"}
+                  {gen ? (
+                    <span className="ml-auto tabular-nums text-muted">{gen.percent}%</span>
+                  ) : null}
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-line/60">
-                  <div className="h-full w-1/3 rounded-full bg-brand animate-indeterminate" />
+                  {gen ? (
+                    <div
+                      className="h-full rounded-full bg-brand transition-[width] duration-300"
+                      style={{ width: `${Math.max(2, gen.percent)}%` }}
+                    />
+                  ) : (
+                    <div className="h-full w-1/3 rounded-full bg-brand animate-indeterminate" />
+                  )}
                 </div>
               </div>
+            )}
+            {/* Sub-second results are the cache, not a fluke — worth saying, since
+                it is the mechanism that keeps a demo off the critical path. */}
+            {!busy && reused && output && (
+              <p className="mt-3 text-sm text-muted">
+                Reused an already-verified output for this type and language — no model call.
+                Regenerate from scratch with the API&apos;s <code>refresh</code> flag.
+              </p>
             )}
           </CardBody>
         </Card>

@@ -33,6 +33,11 @@ class Job(Base):
     )
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Worker-reported completion, 0–100, with a short human phase in `detail`
+    # ("verifying sentence 7 of 12"). Reported from the work itself rather than
+    # inferred from elapsed time, so the number on screen means something.
+    progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(80), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
