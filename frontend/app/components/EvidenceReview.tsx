@@ -49,7 +49,7 @@ export default function EvidenceReview({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   // An omitted claim has no sentence to select, so the evidence panel can also be
-  // focused on a claim key directly — that is how a reviewer inspects what was
+  // focused on a claim key directly, that is how a reviewer inspects what was
   // left out and where it sits in the paper.
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [showOmissions, setShowOmissions] = useState(false);
@@ -86,7 +86,7 @@ export default function EvidenceReview({
     [output, decisions],
   );
 
-  /** Toggle a ruling, optimistically — then persist it. */
+  /** Toggle a ruling, optimistically, then persist it. */
   const rule = async (orderIndex: number, want: Decision) => {
     const next = decisions[orderIndex] === want ? null : want;
     setDecisions((d) => {
@@ -107,7 +107,7 @@ export default function EvidenceReview({
         else delete copy[orderIndex];
         return copy;
       });
-      setSaveError("Could not save that decision — check the connection and try again.");
+      setSaveError("Could not save that decision, check the connection and try again.");
     }
   };
 
@@ -130,7 +130,7 @@ export default function EvidenceReview({
       setCopied(withCitations ? "cited" : "text");
       setTimeout(() => setCopied(null), 2000);
     } catch {
-      setSaveError("Copying failed — your browser blocked clipboard access.");
+      setSaveError("Copying failed, your browser blocked clipboard access.");
     }
   };
 
@@ -204,7 +204,7 @@ export default function EvidenceReview({
                       </span>
                     ) : (
                       <span className="mt-1 block text-xs">
-                        claim not loaded — reopen the document to inspect it
+                        claim not loaded, reopen the document to inspect it
                       </span>
                     )}
                   </button>
@@ -266,13 +266,13 @@ export default function EvidenceReview({
 
       {output.output_type === "SOCIAL" && (
         <p className="mb-4 text-xs text-muted">
-          {chars} characters — {chars <= 280 ? "fits X" : `${chars - 280} over the X limit`}; well
+          {chars} characters, {chars <= 280 ? "fits X" : `${chars - 280} over the X limit`}; well
           within LinkedIn.
         </p>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1fr]">
-        {/* Left — generated output */}
+        {/* Left, generated output */}
         <div>
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand">
             {output.output_type.replace("_", " ")} · {output.language.toUpperCase()}
@@ -280,7 +280,7 @@ export default function EvidenceReview({
           <h3 className="font-serif text-2xl font-semibold leading-snug text-balance">
             {output.title}
           </h3>
-          {/* The headline is verified like any factual sentence — it is the line most
+          {/* The headline is verified like any factual sentence, it is the line most
               likely to be quoted, so its verdict is shown alongside it. */}
           {output.title_verdict && (
             <div className="mb-4 mt-1.5 flex flex-wrap items-center gap-2">
@@ -317,7 +317,7 @@ export default function EvidenceReview({
           </div>
         </div>
 
-        {/* Right — evidence */}
+        {/* Right, evidence */}
         <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
             {focusKey ? "Omitted claim" : "Source evidence"}
@@ -401,7 +401,7 @@ export default function EvidenceReview({
                   />
                 </div>
                 <figcaption className="border-t border-line bg-paper px-3 py-1.5 text-[11px] text-muted">
-                  Original source — zoom to read the surrounding text.
+                  Original source, zoom to read the surrounding text.
                 </figcaption>
               </figure>
 
@@ -475,7 +475,7 @@ function SentenceCard({
         </div>
       )}
       {/* Why the verdict fell where it did. Shown for anything short of clearly
-          supported, because that is when a reviewer needs the reason — the
+          supported, because that is when a reviewer needs the reason, the
           adjudicating model's own words, not a generic label. */}
       {s.rationale && s.verdict !== "SUPPORTED" && s.verdict !== "RHETORICAL" ? (
         <p

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# UniPress DE — scripted redeploy (docs/08 P6): pull → build → migrate → up → verify.
+# UniPress DE, scripted redeploy (docs/08 P6): pull → build → migrate → up → verify.
 #
 #   ops/deploy.sh                  # redeploy the checked-out branch
 #   ops/deploy.sh --no-pull        # rebuild + restart only (config-only change)
@@ -7,7 +7,7 @@
 #   ops/deploy.sh --force-rebuild  # build --no-cache (when a cached layer is stale)
 #   DOMAIN=unipress.gilbertmutai.com ops/deploy.sh   # also verify the public edge
 #
-# Server prerequisite in .env (pins the production overlay — nginx, no host ports):
+# Server prerequisite in .env (pins the production overlay, nginx, no host ports):
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
 set -euo pipefail
 
@@ -28,10 +28,10 @@ for arg in "$@"; do
     esac
 done
 
-[[ -f .env ]] || { echo "✗ .env missing — copy .env.example and fill it in" >&2; exit 1; }
+[[ -f .env ]] || { echo "✗ .env missing, copy .env.example and fill it in" >&2; exit 1; }
 
 if ! grep -q 'docker-compose.prod.yml' .env; then
-    echo "! .env does not pin docker-compose.prod.yml — deploying the DEV topology"
+    echo "! .env does not pin docker-compose.prod.yml, deploying the DEV topology"
     echo "  (host ports published, no nginx/TLS). Intentional only on a laptop."
 fi
 
@@ -45,12 +45,12 @@ echo "→ Deploying $(git rev-parse --short HEAD) ($(git rev-parse --abbrev-ref 
 
 if ((BUILD)); then
     # The frontend bakes NEXT_PUBLIC_API_BASE at build time, so any UI change
-    # needs a real image rebuild — `up -d` alone would keep serving the old
+    # needs a real image rebuild, `up -d` alone would keep serving the old
     # bundle. Image IDs are recorded either side of the build so a rebuild that
     # silently changed nothing is visible rather than assumed.
     # Inspect the image *tags*, not `compose images`: the latter reports what each
     # running container is using and exits non-zero once a rebuild has replaced an
-    # image out from under a live container ("No such image: sha256:…") — which is
+    # image out from under a live container ("No such image: sha256:…"), which is
     # every deploy that changes anything. Under `set -e` that turned this
     # diagnostic into a deploy failure right after a successful build.
     image_ids() {
@@ -66,11 +66,11 @@ if ((BUILD)); then
         docker compose build
     fi
     after="$(image_ids)"
-    # Informational only — never fail the deploy over it.
+    # Informational only, never fail the deploy over it.
     if [[ -z $before || -z $after ]]; then
         echo "  (could not compare image ids)"
     elif [[ $before == "$after" ]]; then
-        echo "  (frontend/api images unchanged — no code change, or a stale cache)"
+        echo "  (frontend/api images unchanged, no code change, or a stale cache)"
     else
         echo "  frontend/api images rebuilt"
     fi
@@ -83,8 +83,7 @@ echo "→ alembic upgrade head"
 docker compose run --rm migrate
 
 # Assert the database actually reached the newest revision in the working tree.
-# `alembic upgrade head` inside a STALE migrate image exits 0 having done nothing —
-# its own "head" is the old one — and the freshly built api then writes to columns
+# `alembic upgrade head` inside a STALE migrate image exits 0 having done nothing, # its own "head" is the old one, and the freshly built api then writes to columns
 # that do not exist. That happened: a selective `build api worker frontend` left
 # migrate behind and broke generation in production. Comparing against the repo,
 # not against the container's opinion, is what catches it.
@@ -105,7 +104,7 @@ PY
 actual="$(docker compose exec -T postgres psql -U "${POSTGRES_USER:-unipress}" \
     -d "${POSTGRES_DB:-unipress}" -tAc 'select version_num from alembic_version' 2>/dev/null | tr -d '\r')"
 if [[ $expected == AMBIGUOUS ]]; then
-    echo "! multiple alembic heads in the working tree — merge them before deploying" >&2
+    echo "! multiple alembic heads in the working tree, merge them before deploying" >&2
 elif [[ -n $expected && $actual != "$expected" ]]; then
     echo "✗ database is at '$actual' but the repo's head is '$expected'." >&2
     echo "  The migrate image is stale. Run: docker compose build migrate" >&2
@@ -119,7 +118,7 @@ docker compose up -d --remove-orphans
 
 # Recreating api/frontend gives them new container IPs. nginx resolves upstream
 # names when it loads its config, so without a reload it keeps proxying to the
-# old address and every /api/* request 502s — which is exactly what happened on
+# old address and every /api/* request 502s, which is exactly what happened on
 # the first scripted deploy. A reload re-resolves them with no dropped
 # connections. (The config also re-resolves per request now; this covers the
 # case where that is not yet deployed.)
@@ -141,7 +140,7 @@ done
 if ((healthy)); then
     echo "✓ api /health OK"
 else
-    echo "✗ api did not become healthy — recent logs:" >&2
+    echo "✗ api did not become healthy, recent logs:" >&2
     docker compose logs --tail 40 api >&2
     exit 1
 fi
@@ -158,7 +157,7 @@ if [[ -n "${DOMAIN:-}" ]]; then
     if curl -fsS "https://$DOMAIN/" | grep -q 'href="/api/'; then
         echo "✓ frontend built for single origin (links to /api)"
     else
-        echo "✗ served page has no /api links — frontend built without" >&2
+        echo "✗ served page has no /api links, frontend built without" >&2
         echo "  NEXT_PUBLIC_API_BASE=/api. Re-run with --force-rebuild." >&2
         exit 1
     fi
@@ -167,7 +166,7 @@ if [[ -n "${DOMAIN:-}" ]]; then
     if curl -fsS "https://$DOMAIN/api/docs" | grep -q "url: '/api/openapi.json'"; then
         echo "✓ Swagger resolves its schema under /api"
     else
-        echo "! /api/docs is not pointing at /api/openapi.json — check ROOT_PATH=/api" >&2
+        echo "! /api/docs is not pointing at /api/openapi.json, check ROOT_PATH=/api" >&2
     fi
 fi
 

@@ -7,7 +7,7 @@ can consume either the API JSON or an in-process run. No dependency on ``app``.
 The gold-independent metrics (hallucination, faithfulness, claim-precision,
 evidence-link validity, readability) run on any generated output. The gold-based
 metrics (key-fact coverage, false-supported, adversarial-caught) activate only
-when a frozen gold set is supplied — see ``eval/gold/`` and ``run_eval.py``.
+when a frozen gold set is supplied, see ``eval/gold/`` and ``run_eval.py``.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def faithfulness(sentences: list[Sentence]) -> float:
     """Mean grounding confidence over factual sentences (docs/05 §3.1, RAGAS-style).
 
     Reuses the TrustLayer's per-sentence confidence (the NLI + judge + overlap
-    blend) rather than a second RAGAS pass — same signal, no extra LLM spend.
+    blend) rather than a second RAGAS pass, same signal, no extra LLM spend.
     """
     scored = [
         s["confidence"] for s in factual_sentences(sentences) if s.get("confidence") is not None
@@ -92,7 +92,7 @@ _VOWEL_RUN = re.compile(r"[aeiouy]+")
 
 
 def _syllables(word: str) -> int:
-    """Vowel-group syllable estimate — the classic offline approximation."""
+    """Vowel-group syllable estimate: the classic offline approximation."""
     w = word.lower().strip("'\".,;:!?()[]")
     if not w:
         return 0
@@ -133,10 +133,10 @@ def _flesch(text: str, language: str) -> tuple[float, str]:
             # environment (CI) cannot fetch it, and a readability metric must not
             # fail the eval gate over a missing optional corpus. The offline
             # estimate uses the same Flesch formula with vowel-group syllables,
-            # so values stay on the same scale — close, not identical.
+            # so values stay on the same scale, close, not identical.
             return _flesch_offline(text), "flesch_offline"
     # HU: textstat's English syllable model doesn't transfer. Approximate ease from
-    # mean words-per-sentence (shorter sentences read easier) — labelled a heuristic.
+    # mean words-per-sentence (shorter sentences read easier), labelled a heuristic.
     sentences = [s for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
     words = text.split()
     if not sentences or not words:
@@ -168,7 +168,7 @@ def coverage(
     ``key_fact_keys`` are the gold facts' claim keys flagged must-not-miss. A gold
     fact counts as covered if any factual sentence cites its key (or ``match_key_fn``
     returns True for a looser embedding/entity match). With no gold set, callers pass
-    an empty list and this returns coverage=None (n/a) — see the intrinsic proxy below.
+    an empty list and this returns coverage=None (n/a), see the intrinsic proxy below.
     """
     if not key_fact_keys:
         return {"coverage": None, "matched": [], "missed": [], "note": "no gold set"}
@@ -191,10 +191,10 @@ def quality_score(
     evidence: float,
     readability_band_hit: bool,
 ) -> float:
-    """Aggregate 0–100 quality, trust-weighted (docs/05 §5).
+    """Aggregate 0-100 quality, trust-weighted (docs/05 §5).
 
     When no gold coverage is available, its 0.20 weight is redistributed across the
-    remaining signals so the score stays on 0–100 and comparable within a gold-less run.
+    remaining signals so the score stays on 0-100 and comparable within a gold-less run.
     """
     read = 1.0 if readability_band_hit else 0.0
     if cov is None:

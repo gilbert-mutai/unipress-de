@@ -15,7 +15,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.db_models import OutputRecord
-from app.outputs.manifest import attribution_for, citation_for
+from app.outputs.manifest import citation_for
 
 _TEMPLATES = Path(__file__).parent / "templates"
 _env = Environment(

@@ -1,9 +1,9 @@
-"""Deterministic claim extractor — no LLM required.
+"""Deterministic claim extractor: no LLM required.
 
 A pragmatic, dependency-free baseline that keeps the pipeline (and its tests)
 runnable without any API key. It splits chunk text into sentences, keeps the
 claim-like ones (findings, methods, limitations, and quantitative statements),
-types them by cue words, and — crucially — runs every candidate through the
+types them by cue words, and, crucially, runs every candidate through the
 quote-verification guardrail so each stored claim is provably grounded in the
 source. The schema-constrained LLM path (app/claims/llm_extractor.py) is the
 higher-quality alternative behind the same guardrail; this baseline covers the

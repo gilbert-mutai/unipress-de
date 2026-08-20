@@ -23,7 +23,7 @@ def test_numeric_mismatch_catches_wrong_number() -> None:
 
 
 def test_numeric_mismatch_reads_hungarian_decimal_commas() -> None:
-    """HU writes 88,8 where the EN source writes 88.8 — that is not a mismatch.
+    """HU writes 88,8 where the EN source writes 88.8: that is not a mismatch.
 
     Reading every comma as a thousands separator turned 88,8 into 888 and made
     the TrustLayer return CONTRADICTED for correct Hungarian sentences.
@@ -45,7 +45,7 @@ def test_numeric_mismatch_ignores_digits_inside_identifiers() -> None:
     """A leaked "(clm_003, clm_005)" citation is not a numeric claim.
 
     Reading the digits out of clm_003 hard-failed correct sentences to
-    CONTRADICTED — observed in production on the Hungarian video script.
+    CONTRADICTED, observed in production on the Hungarian video script.
     """
     assert numeric_mismatch("It raises capacity (clm_003, clm_005).", PREMISE) is False
     assert numeric_mismatch("88,8%-os pontosság (clm_002, clm_024).", PREMISE) is False

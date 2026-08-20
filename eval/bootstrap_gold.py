@@ -4,7 +4,7 @@
 The extractor does the heavy lifting; a human then verifies/corrects/marks key facts.
 This script ingests each research paper, dumps every extracted claim, proposes an
 initial set of key facts (top findings/quantitative by importance), and auto-generates
-numeric overclaim traps — each **self-validated** by running it through the TrustLayer
+numeric overclaim traps, each **self-validated** by running it through the TrustLayer
 so only traps the system actually catches are proposed. Output goes to
 ``eval/gold/<paper_id>.candidate.yaml`` (the harness ignores ``.candidate`` files;
 rename to ``<paper_id>.yaml`` once verified to freeze it as gold).
@@ -112,7 +112,7 @@ def bootstrap(paper: dict[str, Any], db: Any) -> dict[str, Any]:
     traps = _build_traps(claims)
     return {
         "paper_id": paper["id"],
-        "_status": "CANDIDATE — human must verify/correct/mark key facts before freezing",
+        "_status": "CANDIDATE, human must verify/correct/mark key facts before freezing",
         "key_fact_claim_keys": key_facts,
         "adversarial": traps,
         "_all_claims": [  # reference for the human reviewer (drop before freezing)

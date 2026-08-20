@@ -97,7 +97,7 @@ def test_review_decision_persists_and_shapes_the_publish_render(client: TestClie
     )
     assert r.status_code == 200 and r.json()["edited_text"] == "A reviewer rewrote this line."
 
-    # Decisions survive a fresh read — they are on the row, not in a browser.
+    # Decisions survive a fresh read, they are on the row, not in a browser.
     reread = {
         s["order_index"]: s
         for s in client.get(f"/documents/outputs/{output_id}").json()["sentences"]

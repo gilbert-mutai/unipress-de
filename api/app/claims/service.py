@@ -2,7 +2,7 @@
 
 Reads a document's persisted chunks, runs the configured extractor (heuristic by
 default; LLM path opt-in via settings.llm_extraction), and persists the resulting
-quote-verified claims. Extraction is idempotent — prior claims are cleared first.
+quote-verified claims. Extraction is idempotent, prior claims are cleared first.
 """
 
 from __future__ import annotations

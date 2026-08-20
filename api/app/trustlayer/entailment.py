@@ -2,7 +2,7 @@
 
 `classify()` returns 3-way NLI scores (entail / neutral / contradict).
 `LexicalEntailment` is a dependency-free proxy (word overlap; it cannot detect
-contradiction, so `contradict` is always 0) — enough to run and test the
+contradiction, so `contradict` is always 0), enough to run and test the
 TrustLayer with no model. The real `DebertaNLI` backend (app/trustlayer/nli.py)
 implements the same port and is selected via settings.nli_backend="nli".
 """

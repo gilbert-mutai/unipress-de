@@ -2,7 +2,7 @@
  *
  * The review UI shows verdicts and claim ids because that is its job. What gets
  * pasted into a newsroom CMS, an email or a social composer must carry none of
- * that — just the text, shaped for where it is going, with flagged sentences gone
+ * that, just the text, shaped for where it is going, with flagged sentences gone
  * and reviewer edits applied.
  */
 import { Decision, OutputDetail, SentenceRead } from "./api";

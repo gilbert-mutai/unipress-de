@@ -1,4 +1,4 @@
-# UniPress DE — Project Structure
+# UniPress DE: Project Structure
 
 > Documentation of the repository layout, components, and data flow.
 > **Reflects the codebase as of Phase 4 + product-polish pass.** The full stack runs
@@ -6,15 +6,15 @@
 > extraction** (1b), **embeddings → Chroma retrieval** (1c), **claim-bound
 > generation + the full TrustLayer** (2), **5 output types + HTML/PDF rendering
 > with evidence trail + attribution** (3), and the **Next.js review dashboard** (4)
-> are implemented and **verified live on the running stack** — including an
+> are implemented and **verified live on the running stack**: including an
 > editorial UI redesign, real ingestion progress %, and a real-PDF source-highlight
-> panel. Phase 5 (eval + observability) is next — see
+> panel. Phase 5 (eval + observability) is next, see
 > [Status & maturity](#status--maturity). Everything below is based on the actual
 > committed files, not planned features.
 >
-> 🔄 **This is a living document — keep it current.** Whenever a change adds or
+> 🔄 **This is a living document, keep it current.** Whenever a change adds or
 > removes a service, entry point, route, model, migration, env var, dependency,
-> or top-level folder — or completes a phase — update the affected sections
+> or top-level folder, or completes a phase, update the affected sections
 > (tree, tables, env vars, data flow, status) in the *same* change. Base every
 > entry on the real files; mark built vs. planned; never invent a file's purpose.
 
@@ -23,8 +23,8 @@
 ## 1. What this project is
 
 UniPress DE turns a research paper (PDF) into bilingual (Hungarian + English)
-science-communication materials — press release, lay article, social posts,
-executive summary, video script — where **every claim is traced to its source
+science-communication materials, press release, lay article, social posts,
+executive summary, video script, where **every claim is traced to its source
 and audited for hallucination** before human review. See [`README.md`](README.md)
 and [`docs/01-project-definition.md`](docs/01-project-definition.md) for the
 product framing.
@@ -160,7 +160,7 @@ unipress-de/
 │   ├── tempo/tempo.yaml             # Trace storage
 │   └── grafana/provisioning/datasources/datasources.yaml
 │
-├── docs/                        # Design/planning series (01–08) — source of truth
+├── docs/                        # Design/planning series (01-08), source of truth
 │   ├── 01-project-definition.md
 │   ├── 02-architecture.md
 │   ├── 03-ai-pipeline.md
@@ -173,7 +173,7 @@ unipress-de/
 ├── data/
 │   └── manifest.yaml            # Provenance + license for the sample corpus (PDFs gitignored)
 │
-├── sample_files_for_PR/         # Source PDFs — GITIGNORED, not committed
+├── sample_files_for_PR/         # Source PDFs. GITIGNORED, not committed
 │
 ├── docker-compose.yml           # ★ Service topology (profiles: core|observability|ml|local-llm)
 ├── docker-compose.override.yml  # Local-dev port publishing
@@ -203,7 +203,7 @@ unipress-de/
 | `worker/` | Backend (doc only) | Placeholder for the future ML-heavy worker image | Currently reuses `api/`'s image; splits later (see below) |
 | `frontend/` | Frontend | Next.js evidence-review UI | The product surface and demo |
 | `ops/` | Infra config | OTel/Prometheus/Tempo/Grafana configs | Observability is a first-class, day-one concern |
-| `docs/` | Documentation | Numbered design series `01`–`08` | The living source of truth; a competition asset |
+| `docs/` | Documentation | Numbered design series `01`: `08` | The living source of truth; a competition asset |
 | `data/` | Data | `manifest.yaml` (provenance/licensing) | Legal/attribution record for the corpus |
 | `sample_files_for_PR/` | Data (ignored) | The 6 sample source PDFs | Input corpus; not committed (size + licensing) |
 | repo root | Config | Compose, CI, env template, pre-commit | Ties the services into one runnable system |
@@ -237,7 +237,7 @@ ML-heavy image once embeddings/NLI land.
 | [`settings.py`](api/app/core/settings.py) | Typed, env-driven config via `pydantic-settings`. `get_settings()` is `lru_cache`d. Invalid config fails fast at boot. |
 | [`db.py`](api/app/core/db.py) | Creates the SQLAlchemy `Engine` and `SessionLocal`, defines the declarative `Base`, and provides `session_scope()` (worker transactions) and `get_db()` (FastAPI dependency). |
 | [`logging.py`](api/app/core/logging.py) | Configures `structlog` to emit structured JSON logs at the configured level. |
-| [`telemetry.py`](api/app/core/telemetry.py) | Installs an OpenTelemetry `TracerProvider`. OTLP export is **conditional** — only active when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so the `core` profile runs cleanly without a collector. Also instruments Celery. |
+| [`telemetry.py`](api/app/core/telemetry.py) | Installs an OpenTelemetry `TracerProvider`. OTLP export is **conditional**: only active when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so the `core` profile runs cleanly without a collector. Also instruments Celery. |
 
 ### 5.2 Domain models
 
@@ -247,7 +247,7 @@ ML-heavy image once embeddings/NLI land.
 | [`models.py`](api/app/models.py) | Pydantic | API contracts: `JobRead`, `DocumentRead` (incl. `stage`/`progress` for the UI bar), `ChunkRead`, `ClaimRead` (incl. `bbox`), `SearchHit`, `GenerateRequest`, `OutputSummary`/`OutputDetail`, `SentenceRead`. |
 | [`ingestion/models.py`](api/app/ingestion/models.py) | Pydantic | `SourceSpan` (docs/03 §1.1), `Block`, `Page`, `ParsedDoc`, `Chunk`. |
 | [`claims/models.py`](api/app/claims/models.py) | Pydantic | `ClaimType` (docs/03 §2.2), `Claim` (docs/03 §1.2). |
-| [`generation/models.py`](api/app/generation/models.py) | Pydantic | `OutputType`, `SentenceRole`, `Verdict`, `GeneratedSentence`/`GeneratedOutput` (docs/03 §1.3–1.4), `OutputSpec`. |
+| [`generation/models.py`](api/app/generation/models.py) | Pydantic | `OutputType`, `SentenceRole`, `Verdict`, `GeneratedSentence`/`GeneratedOutput` (docs/03 §1.3-1.4), `OutputSpec`. |
 
 ### 5.3 Ports & adapters (hexagonal architecture)
 
@@ -257,31 +257,31 @@ are swappable. This is the key architectural pattern.
 | Port ([`ports/base.py`](api/app/ports/base.py)) | Purpose | Phase-0 adapter ([`adapters/stubs.py`](api/app/adapters/stubs.py)) | Graduation target |
 |---|---|---|---|
 | `VectorStore` | Embedding index (add/query/delete over vectors + metadata) | `ChromaVectorStore` (real) + `InMemoryVectorStore` (tests) in [`retrieval/`](api/app/retrieval/) | Chroma → Qdrant |
-| `LLMGateway` | Text generation | `EchoLLM` stub **and** `LiteLLMGateway` ([`llm/gateway.py`](api/app/llm/gateway.py), real, opt-in) | LiteLLM (OpenAI/Ollama) — done |
+| `LLMGateway` | Text generation | `EchoLLM` stub **and** `LiteLLMGateway` ([`llm/gateway.py`](api/app/llm/gateway.py), real, opt-in) | LiteLLM (OpenAI/Ollama), done |
 | `Storage` | Blob storage | `LocalStorage` (local FS, now storing uploaded PDFs + parse artifacts) | MinIO / S3 |
 | `TaskDispatch` | Async job dispatch | `CeleryTaskDispatch` (`enqueue_pipeline`, `enqueue_ingestion`) | (Celery kept) |
 
 Ports are `runtime_checkable` `Protocol`s, so `isinstance()` verifies an adapter
-satisfies a port — [`tests/test_jobs.py`](api/tests/test_jobs.py) asserts exactly this.
+satisfies a port, [`tests/test_jobs.py`](api/tests/test_jobs.py) asserts exactly this.
 
 ### 5.4 API routes (`app/api/`)
 
 | Method & path | Handler | Responsibility |
 |---|---|---|
-| `GET /health` | [`health.py`](api/app/api/health.py) | Liveness — process is up (no deps checked). Used by the container healthcheck. |
-| `GET /ready` | `health.py` | Readiness — executes `SELECT 1` to confirm the DB is reachable. |
+| `GET /health` | [`health.py`](api/app/api/health.py) | Liveness, process is up (no deps checked). Used by the container healthcheck. |
+| `GET /ready` | `health.py` | Readiness, executes `SELECT 1` to confirm the DB is reachable. |
 | `POST /jobs` | [`jobs.py`](api/app/api/jobs.py) | Creates a `Job` row (status `pending`), then enqueues the demo pipeline. Returns immediately (201). |
 | `GET /jobs/{id}` | `jobs.py` | Reads current job state (404 if missing). The frontend polls this. |
 | `POST /documents` | [`documents.py`](api/app/api/documents.py) | Uploads a PDF (multipart), stores it via the `Storage` port, creates a `Document`+`Job`, enqueues the ingestion chain (201). Validates `.pdf` + size cap. |
 | `GET /documents/{id}` | `documents.py` | Ingestion status: page/chunk counts, warnings, errors (404 if missing). |
-| `GET /documents/{id}/chunks` | `documents.py` | Ordered chunks with spans (page/section/offsets/bbox) — the evidence-highlight source. |
+| `GET /documents/{id}/chunks` | `documents.py` | Ordered chunks with spans (page/section/offsets/bbox), the evidence-highlight source. |
 | `GET /documents/{id}/claims` | `documents.py` | Extracted claims: text, type, quote, span, numeric flag, importance. |
-| `GET /documents/{id}/pages/{n}.png` | `documents.py` | Source page rendered to PNG, optionally highlighting a cited `bbox` — powers the review UI's source panel. |
+| `GET /documents/{id}/pages/{n}.png` | `documents.py` | Source page rendered to PNG, optionally highlighting a cited `bbox`: powers the review UI's source panel. |
 | `POST /documents/{id}/search` | `documents.py` | Semantic search (RAG retrieval): embeds the query, queries the vector store, returns span-linked chunk hits with scores. |
 | `POST /documents/{id}/outputs` | `documents.py` | Enqueue claim-bound generation of one output type/language (202; poll job, `result` = output id). |
 | `GET /documents/{id}/outputs` | `documents.py` | List generated outputs for a document. |
 | `GET /documents/outputs/{id}` | `documents.py` | Full output: each sentence with role, cited claim ids, **verdict + confidence** + `coverage` (the evidence-review payload). |
-| `GET /documents/outputs/{id}/render` | `documents.py` | Render the output as `html` (default) or `pdf` — evidence trail, verdict badges, coverage warnings, attribution footer. |
+| `GET /documents/outputs/{id}/render` | `documents.py` | Render the output as `html` (default) or `pdf`: evidence trail, verdict badges, coverage warnings, attribution footer. |
 | `GET /` | [`main.py`](api/app/main.py) | Service metadata. |
 | `GET /metrics` | (Instrumentator) | Prometheus metrics, scraped by Prometheus. |
 | `GET /docs` | (FastAPI) | OpenAPI/Swagger UI. |
@@ -305,20 +305,20 @@ payloads cross the broker and each stage is idempotent.
 
 ### 5.6 Database, migrations & schema
 
-- **ORM/engine:** [`app/core/db.py`](api/app/core/db.py) — synchronous SQLAlchemy 2.x with `psycopg` (Postgres 16).
+- **ORM/engine:** [`app/core/db.py`](api/app/core/db.py), synchronous SQLAlchemy 2.x with `psycopg` (Postgres 16).
 - **Migrations:** Alembic. [`alembic/env.py`](api/alembic/env.py) pulls the URL and `Base.metadata` from the app (no duplicated config) and imports `db_models` so tables register.
-- **`0001_initial`** ([versions/0001_initial.py](api/alembic/versions/0001_initial.py)) — `jobs` table + `ix_jobs_status`.
-- **`0002_documents_chunks`** ([versions/0002_documents_chunks.py](api/alembic/versions/0002_documents_chunks.py)) — `documents` + `chunks` tables (FK `chunks.document_id → documents.id`, cascade) and `jobs.document_id`.
-- **`0003_claims`** ([versions/0003_claims.py](api/alembic/versions/0003_claims.py)) — `claims` table (FK to `documents`, cascade) and `documents.claim_count`.
-- **`0004_outputs`** ([versions/0004_outputs.py](api/alembic/versions/0004_outputs.py)) — `outputs` + `output_sentences` tables (cascade), holding generated outputs and per-sentence verdicts.
-- **`0005_output_coverage`** ([versions/0005_output_coverage.py](api/alembic/versions/0005_output_coverage.py)) — `outputs.coverage` JSON (document-level coverage report).
+- **`0001_initial`** ([versions/0001_initial.py](api/alembic/versions/0001_initial.py)), `jobs` table + `ix_jobs_status`.
+- **`0002_documents_chunks`** ([versions/0002_documents_chunks.py](api/alembic/versions/0002_documents_chunks.py)), `documents` + `chunks` tables (FK `chunks.document_id → documents.id`, cascade) and `jobs.document_id`.
+- **`0003_claims`** ([versions/0003_claims.py](api/alembic/versions/0003_claims.py)), `claims` table (FK to `documents`, cascade) and `documents.claim_count`.
+- **`0004_outputs`** ([versions/0004_outputs.py](api/alembic/versions/0004_outputs.py)), `outputs` + `output_sentences` tables (cascade), holding generated outputs and per-sentence verdicts.
+- **`0005_output_coverage`** ([versions/0005_output_coverage.py](api/alembic/versions/0005_output_coverage.py)), `outputs.coverage` JSON (document-level coverage report).
 - Migrations run via a **one-shot `migrate` service** in Compose that must complete successfully before `api`/`worker` start (`service_completed_successfully`).
 
 ### 5.7 Tests (`api/tests/`)
 
 | File | Covers |
 |---|---|
-| [`conftest.py`](api/tests/conftest.py) | Fixture that swaps the app's DB session for an **in-memory SQLite** engine, routes `Storage` to a tmp dir, and stubs the Celery dispatch to run inline — so tests need **no Postgres, Redis, or Celery**. |
+| [`conftest.py`](api/tests/conftest.py) | Fixture that swaps the app's DB session for an **in-memory SQLite** engine, routes `Storage` to a tmp dir, and stubs the Celery dispatch to run inline, so tests need **no Postgres, Redis, or Celery**. |
 | [`test_health.py`](api/tests/test_health.py) | `/health`, `/ready`, `/` responses. |
 | [`test_jobs.py`](api/tests/test_jobs.py) | Job create+read round-trip, 404 handling, and that stub adapters satisfy their ports. |
 | [`test_ingestion.py`](api/tests/test_ingestion.py) | Parser + chunker on an in-memory generated PDF: page/text extraction, **chunk provenance integrity** (quote == page-text substring), image-only detection. |
@@ -340,7 +340,7 @@ and small CVA-based UI primitives (no external component/icon library).
 
 | File | Role |
 |---|---|
-| [`app/page.tsx`](frontend/app/page.tsx) | The review dashboard: 3-step flow — **upload** a PDF → poll ingestion (determinate **progress bar** with stage + %) → **generate** (type + language; indeterminate bar) → **review**. State-aware step headings. |
+| [`app/page.tsx`](frontend/app/page.tsx) | The review dashboard: 3-step flow, **upload** a PDF → poll ingestion (determinate **progress bar** with stage + %) → **generate** (type + language; indeterminate bar) → **review**. State-aware step headings. |
 | [`app/components/EvidenceReview.tsx`](frontend/app/components/EvidenceReview.tsx) | Side-by-side review: sentences with verdict/confidence badges + citations (left) ↔ evidence (right): claim quote **plus the real source page rendered as PNG with the cited region highlighted**; accept/flag; coverage banner; HTML/PDF export. |
 | [`app/components/PipelineProgress.tsx`](frontend/app/components/PipelineProgress.tsx) | Determinate ingestion progress (stage label + %); page/chunk/claim stat tiles when done. |
 | [`app/components/brand-mark.tsx`](frontend/app/components/brand-mark.tsx) | University of Debrecen logo (`/ud-logo.svg`) with a shield fallback. |
@@ -410,8 +410,7 @@ Key details:
 
 > There is **no Kubernetes, Terraform, or Nginx config in the repo yet.** The
 > production deployment (Angani VM, Nginx + Certbot TLS, backups) is *specified*
-> in [`docs/07-tech-stack.md`](docs/07-tech-stack.md) §9 but not yet codified —
-> it lands in Phase 6.
+> in [`docs/07-tech-stack.md`](docs/07-tech-stack.md) §9 but not yet codified, > it lands in Phase 6.
 
 ### 8.4 CI/CD
 
@@ -427,7 +426,7 @@ The eval-gate and deploy steps referenced in the plan are future (Phase 5/6).
 
 ## 9. Authentication & authorization
 
-**None yet.** There is no auth/authz layer in the Phase-0 codebase — no login,
+**None yet.** There is no auth/authz layer in the Phase-0 codebase, no login,
 sessions, tokens, or role checks. Per [`docs/02-architecture.md`](docs/02-architecture.md)
 §8, SSO/auth and multi-tenancy are explicitly a *production graduation*, not an
 MVP feature. The only access controls today are network-level (intended: data
@@ -439,7 +438,7 @@ services stay on the internal Docker network; Grafana behind admin auth).
 
 Defined in [`.env.example`](.env.example) and consumed by
 [`api/app/core/settings.py`](api/app/core/settings.py) and Compose. **No secret
-values are stored in the repo** — `.env` is gitignored.
+values are stored in the repo**: `.env` is gitignored.
 
 | Variable | Used by | Purpose |
 |---|---|---|
@@ -447,7 +446,7 @@ values are stored in the repo** — `.env` is gitignored.
 | `LOG_LEVEL` | api/worker | structlog level. |
 | `OTEL_SERVICE_NAME` | api/worker | Service name on traces. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | api/worker | OTLP collector endpoint; **empty disables trace export**. |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | postgres, `DATABASE_URL` | DB credentials/name (**secret** — set in `.env`). |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | postgres, `DATABASE_URL` | DB credentials/name (**secret**: set in `.env`). |
 | `DATABASE_URL` | api/worker/migrate | Full SQLAlchemy connection string (assembled in Compose). |
 | `REDIS_URL` | api/worker | Celery broker + result backend. |
 | `STORAGE_ROOT` | api/worker | Filesystem root for uploaded PDFs + parse artifacts (`/data/storage` in Compose). |
@@ -486,8 +485,8 @@ values are stored in the repo** — `.env` is gitignored.
 
 ## 12. Documentation & data
 
-- [`docs/01`–`08`](docs/) — the numbered design series (definition → architecture → AI pipeline → outputs → evaluation → dataset → tech stack → dev plan). These are the **authoritative design record** and are kept in sync with the code as it's built.
-- [`data/manifest.yaml`](data/manifest.yaml) — provenance, authorship, DOI, and license for each of the 6 sample documents. The **PDFs themselves live in `sample_files_for_PR/` and are gitignored** (size + licensing); only the manifest is committed.
+- [`docs/01`: `08`](docs/), the numbered design series (definition → architecture → AI pipeline → outputs → evaluation → dataset → tech stack → dev plan). These are the **authoritative design record** and are kept in sync with the code as it's built.
+- [`data/manifest.yaml`](data/manifest.yaml), provenance, authorship, DOI, and license for each of the 6 sample documents. The **PDFs themselves live in `sample_files_for_PR/` and are gitignored** (size + licensing); only the manifest is committed.
 
 ---
 
@@ -541,9 +540,9 @@ flowchart LR
 | **5 output types + HTML/PDF rendering (evidence trail + attribution)** | **Implemented & verified** (Phase 3) |
 | **Review dashboard + editorial UI, progress %, real-PDF source highlight** | **Implemented & verified live** (Phase 4 + polish pass) |
 | Pairwise-NLI consistency check; thresholds tuning → MLflow | **Deferred** (Phase 5 harness) |
-| Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3–6) |
+| Bilingual outputs, review dashboard, eval harness, deployment | **Not started** (Phases 3-6) |
 
-No files in the committed tree appear **dead or deprecated** — everything present
+No files in the committed tree appear **dead or deprecated**: everything present
 is active. The `VectorStore`/`LLMGateway` stub adapters and the demo `/jobs` chain
 are intentional placeholders, not dead code. See
 [`docs/08-dev-plan.md`](docs/08-dev-plan.md) for the phase roadmap.

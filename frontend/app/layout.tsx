@@ -9,7 +9,7 @@ import { API_BASE } from "./lib/api";
 export const metadata: Metadata = {
   title: "UniPress DE",
   description:
-    "Turn a research paper into bilingual, publication-ready communication — every claim linked to its source and audited for hallucination.",
+    "Turn a research paper into bilingual, publication-ready communication, every claim linked to its source and audited for hallucination.",
   // Tab icon: the same University of Debrecen mark the header shows, referenced
   // from /public rather than copied to app/icon.svg so there is one logo file.
   icons: { icon: "/ud-logo.svg" },

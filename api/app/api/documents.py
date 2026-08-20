@@ -39,7 +39,7 @@ _STAGE_PROGRESS = {"queued": 5, "parse": 25, "chunk": 45, "extract": 65, "embed"
 
 
 def _with_progress(doc: Document, db: Session) -> DocumentRead:
-    """Build a DocumentRead with the latest ingestion stage + a 0–100 progress."""
+    """Build a DocumentRead with the latest ingestion stage + a 0-100 progress."""
     job = db.scalars(
         select(Job).where(Job.document_id == doc.id).order_by(Job.created_at.desc())
     ).first()
@@ -125,7 +125,7 @@ def get_page_image(
 ) -> Response:
     """Render a source PDF page as PNG, optionally highlighting a cited span (x0,y0,x1,y1).
 
-    `zoom` (1–4) sets the render resolution; the review UI raises it when the
+    `zoom` (1-4) sets the render resolution; the review UI raises it when the
     reviewer magnifies, so small print resolves instead of blurring.
     """
     if db.get(Document, document_id) is None:
@@ -198,7 +198,7 @@ def generate_output(
     # Demo safety (docs/08 P6): an output already generated for this
     # (document, type, language) is returned as an already-complete job, so the
     # UI resolves it in one round trip with no model call. That removes live
-    # rate-limit and latency risk from the demo path — the durable outputs table
+    # rate-limit and latency risk from the demo path, the durable outputs table
     # *is* the cache, rather than a second copy in Redis that can disagree with
     # it. `refresh=true` forces a fresh generation.
     if not payload.refresh:
@@ -329,7 +329,7 @@ def render_output(
 
     Two views, because they serve different readers. `evidence` (default, and what
     existed before) annotates every sentence with its verdict, confidence and cited
-    claims — the record for sign-off. `publish` is the deliverable: flagged
+    claims, the record for sign-off. `publish` is the deliverable: flagged
     sentences dropped, reviewer edits applied, no verdict furniture, attribution
     kept. Handing a newsroom the annotated version was the reason the tool had no
     directly usable output.

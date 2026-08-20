@@ -1,7 +1,7 @@
 """Document-level coverage check (docs/03 §5.5).
 
 Of the most important claims, how many made it into the output? Omitted
-high-importance claims — and especially dropped LIMITATIONs — are surfaced as
+high-importance claims, and especially dropped LIMITATIONs, are surfaced as
 warnings so a reviewer knows when a caveat was silently left out.
 """
 
@@ -31,7 +31,7 @@ def coverage_report(claims: list[ClaimInput], output: GeneratedOutput) -> dict:
     warnings: list[str] = []
     if dropped_limitations:
         warnings.append(
-            f"{len(dropped_limitations)} limitation claim(s) omitted — a caveat was dropped"
+            f"{len(dropped_limitations)} limitation claim(s) omitted, a caveat was dropped"
         )
     if omitted_important:
         warnings.append(f"{len(omitted_important)} high-importance claim(s) omitted")

@@ -1,7 +1,7 @@
 """output_sentences: the reviewer's decision, and an edited replacement
 
 Accept/flag lived in browser state, so a reload lost it and the export ignored
-it — a reviewer could strike a sentence and still find it in the PDF. The
+it, a reviewer could strike a sentence and still find it in the PDF. The
 decision belongs with the sentence: it is what makes the publish render
 trustworthy, and it is the human half of a human-in-the-loop system.
 

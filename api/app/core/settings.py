@@ -48,7 +48,7 @@ class Settings(BaseSettings):
 
     # Mount prefix when the api is served behind a path-stripping proxy
     # (production: nginx routes /api/* -> api:8000/*). FastAPI needs it to build
-    # correct absolute links — without it /api/docs asks for /openapi.json at the
+    # correct absolute links, without it /api/docs asks for /openapi.json at the
     # site root, which nginx hands to the frontend. Empty in local dev.
     root_path: str = Field(default="")
 
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     trust_low_threshold: float = Field(default=0.45)
     trust_entail_high: float = Field(default=0.85)  # skip judge if entail above this
     # Drop the quote-overlap term when the output language differs from the
-    # source's — across languages it measures nothing (see trustlayer/scorer.py).
+    # source's, across languages it measures nothing (see trustlayer/scorer.py).
     # Set false to score every language with the same lexical term.
     trust_cross_language_reweight: bool = Field(default=True)
     trust_contradict_cutoff: float = Field(default=0.5)  # NLI contradiction => hard fail

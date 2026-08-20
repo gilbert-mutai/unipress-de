@@ -2,7 +2,7 @@
 
 Opt-in (settings.llm_extraction + a key). For each chunk the model is asked to
 return atomic claims with a verbatim `quote`; every returned quote is then run
-through the quote-verification guardrail — any claim whose quote is not literally
+through the quote-verification guardrail, any claim whose quote is not literally
 present in the chunk is rejected as a hallucinated extraction. This path is
 exercised only when a key is configured; the heuristic extractor is the default.
 """

@@ -1,4 +1,4 @@
-"""The quote-verification guardrail (docs/03 §2.3) — the trust primitive.
+"""The quote-verification guardrail (docs/03 §2.3): the trust primitive.
 
 Every claim must carry a `quote` that is *literally present* in the source. This
 module locates that quote in the source text and returns its character offsets;

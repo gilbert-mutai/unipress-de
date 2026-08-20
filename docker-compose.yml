@@ -1,4 +1,4 @@
-# UniPress DE — service topology (dev/prod parity via profiles).
+# UniPress DE, service topology (dev/prod parity via profiles).
 #   docker compose --profile core up                     # app only
 #   docker compose --profile core --profile observability up   # + OTel/Prom/Tempo/Grafana
 # Profiles: core | observability | ml | local-llm

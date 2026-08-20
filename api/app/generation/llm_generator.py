@@ -1,4 +1,4 @@
-"""Claim-bound LLM generation (docs/03 §4) — opt-in behind settings.llm_generation.
+"""Claim-bound LLM generation (docs/03 §4): opt-in behind settings.llm_generation.
 
 The model is given ONLY the verified claims (as `[clm_xxx] text` lines) and must
 cite claim keys on every factual sentence and introduce no new facts. Output is
@@ -30,7 +30,7 @@ _SYSTEM = (
     "Mark hooks/connectives as role RHETORICAL or TRANSITION (no claim IDs). "
     "The TITLE is verified exactly like a factual sentence: it must cite the claim "
     "IDs it rests on in title_claim_ids, state nothing those claims do not support, "
-    "and avoid superlatives and unqualified figures — a result obtained only in "
+    "and avoid superlatives and unqualified figures, a result obtained only in "
     "simulation must not be titled as an achieved outcome. "
     'Return JSON: {"title":str,"title_claim_ids":[str],"sentences":[{"text":str,"role":'
     '"FACT|INTERPRETATION|RHETORICAL|TRANSITION","claim_ids":[str],"section":str}]}.'
@@ -41,7 +41,7 @@ _VIDEO_SYSTEM = (
     "(hook, context, finding, meaning, cta) using ONLY the provided claims. For each scene "
     "return: text (the spoken narration; factual scenes MUST cite claim IDs and add no new "
     "facts/numbers), on_screen (a very short on-screen caption), visual (a visual suggestion), "
-    "timecode (e.g. '0:20–0:45'), section (the scene name), role "
+    "timecode (e.g. '0:20-0:45'), section (the scene name), role "
     "(FACT for narrated claims; RHETORICAL for the hook/cta). "
     "The TITLE is verified exactly like a factual sentence: cite the claim IDs it "
     "rests on in title_claim_ids, claim nothing beyond them, and avoid superlatives "
@@ -56,10 +56,16 @@ _LANGUAGES = {"en": "English", "hu": "Hungarian"}
 _ROLE_WORDS = {r.value for r in SentenceRole}
 
 
+_STYLE_RULE = (
+    " Punctuate plainly: use commas, colons and full stops. Never use em dashes or"
+    " en dashes, and do not pad sentences with rhetorical asides."
+)
+
+
 def _language_rule(language: str) -> str:
     name = _LANGUAGES.get(language, language)
     return (
-        f" Write EVERY field in {name} — the title and, for video scripts, the "
+        f" Write EVERY field in {name}, the title and, for video scripts, the "
         f"on-screen captions and visual suggestions, not only the body text. "
         f"Claim IDs stay verbatim; do not translate or restyle them."
     )
@@ -75,7 +81,7 @@ def _prompt(spec: OutputSpec, claims: list[ClaimInput], language: str) -> str:
     )
 
 
-# Claim ids belong in the claim_ids field, not in the prose — but the model
+# Claim ids belong in the claim_ids field, not in the prose, but the model
 # occasionally trails them into the sentence itself ("…consistency (clm_003,
 # clm_005)."), most often when writing Hungarian. Left in, they are published
 # text a reviewer would see, and the numeric check reads the digits out of
@@ -144,7 +150,7 @@ def generate_llm(
     # posts and video scripts came back with correct HU prose but an English title
     # every time, the model treating "title" (and the video captions) as metadata
     # rather than output. Every SOCIAL/hu and VIDEO_SCRIPT/hu run was affected.
-    system = base + _language_rule(language)
+    system = base + _language_rule(language) + _STYLE_RULE
     user = _prompt(spec, claims, language)
     output = _parse(gateway.complete_json(system, user), spec, language, title_hint)
 

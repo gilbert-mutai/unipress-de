@@ -34,9 +34,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  // The chosen file, held while it uploads — the document does not exist yet.
+  // The chosen file, held while it uploads, the document does not exist yet.
   const [pending, setPending] = useState<{ name: string; size: number } | null>(null);
-  const [sent, setSent] = useState(0); // fraction of bytes transferred, 0–1
+  const [sent, setSent] = useState(0); // fraction of bytes transferred, 0-1
   // Worker-reported generation progress, and whether the result was reused.
   const [gen, setGen] = useState<{ percent: number; detail: string | null } | null>(null);
   const [reused, setReused] = useState(false);
@@ -65,7 +65,7 @@ export default function Home() {
     }
   }
 
-  // Open an already-ingested paper with ?doc=<id> — the demo path, since those
+  // Open an already-ingested paper with ?doc=<id>, the demo path, since those
   // documents already have their outputs generated, so a click costs no model
   // call. Deliberately only the explicit parameter: a bare URL always starts at
   // the upload box, so the full pipeline can be shown (or recorded) from
@@ -139,7 +139,7 @@ export default function Home() {
     : doc.status === "done"
       ? "Extracted into a verified claim store."
       : doc.status === "failed"
-        ? "We couldn't read this PDF — try another file."
+        ? "We couldn't read this PDF, try another file."
         : "Reading and analyzing your paper…";
 
   return (
@@ -161,7 +161,7 @@ export default function Home() {
         </p>
       )}
 
-      {/* Step 1 — upload */}
+      {/* Step 1, upload */}
       <Card className="animate-fade-up">
         <CardBody>
           <StepHeading n={1} title={uploadTitle} hint={uploadHint} />
@@ -173,7 +173,7 @@ export default function Home() {
                 <span className="text-sm text-muted">{formatSize(pending.size)}</span>
                 <span className="ml-auto text-sm tabular-nums text-muted">
                   {/* Once the bytes are all sent the wait is the server's, not the
-                      network's — say so rather than sitting at 100%. */}
+                      network's, say so rather than sitting at 100%. */}
                   {sent >= 1 ? "Preparing…" : `Uploading ${Math.round(sent * 100)}%`}
                 </span>
               </div>
@@ -188,7 +188,7 @@ export default function Home() {
               </div>
               {pending.size > 2_000_000 && sent < 1 && (
                 <p className="mt-2 text-xs text-muted">
-                  {formatSize(pending.size)} over a slow connection can take a minute — a
+                  {formatSize(pending.size)} over a slow connection can take a minute, a
                   smaller paper uploads in seconds.
                 </p>
               )}
@@ -246,7 +246,7 @@ export default function Home() {
         </CardBody>
       </Card>
 
-      {/* Step 2 — generate */}
+      {/* Step 2, generate */}
       {doc?.status === "done" && (
         <Card className="mt-6 animate-fade-up">
           <CardBody>
@@ -289,11 +289,11 @@ export default function Home() {
                 </div>
               </div>
             )}
-            {/* Sub-second results are the cache, not a fluke — worth saying, since
+            {/* Sub-second results are the cache, not a fluke, worth saying, since
                 it is the mechanism that keeps a demo off the critical path. */}
             {!busy && reused && output && (
               <p className="mt-3 text-sm text-muted">
-                Reused an already-verified output for this type and language — no model call.
+                Reused an already-verified output for this type and language, no model call.
                 Regenerate from scratch with the API&apos;s <code>refresh</code> flag.
               </p>
             )}
@@ -301,7 +301,7 @@ export default function Home() {
         </Card>
       )}
 
-      {/* Step 3 — review */}
+      {/* Step 3, review */}
       {output && doc && (
         <Card className="mt-6 animate-fade-up">
           <CardBody>

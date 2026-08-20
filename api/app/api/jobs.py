@@ -1,6 +1,6 @@
 """Jobs API: read-only progress for work enqueued elsewhere.
 
-Jobs are created by the pipelines that own them — ingestion (POST /documents)
+Jobs are created by the pipelines that own them, ingestion (POST /documents)
 and generation (POST /documents/{id}/outputs). There is deliberately no public
 create route: the Phase 0 skeleton had one taking arbitrary `input_text`, which
 let anyone spend worker time on a job bound to no document.

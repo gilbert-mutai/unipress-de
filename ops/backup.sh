@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# UniPress DE — nightly backup (docs/08 P6): Postgres logical dump + Chroma and
+# UniPress DE, nightly backup (docs/08 P6): Postgres logical dump + Chroma and
 # uploaded-PDF volume snapshots, with retention. Reproducible from the repo.
 #
 #   ops/backup.sh                 # run a backup now
@@ -27,13 +27,13 @@ docker run --rm -v "${PROJECT}_storage:/data:ro" -v "$BACKUP_DIR:/backup" alpine
     tar czf "/backup/storage-$STAMP.tar.gz" -C /data .
 
 # The eval history (MLflow runs + artifacts) is demo evidence, so it is backed up
-# too. Absent on hosts that never ran the `ml` profile — skip rather than fail.
+# too. Absent on hosts that never ran the `ml` profile, skip rather than fail.
 if docker volume inspect "${PROJECT}_mlflowdata" >/dev/null 2>&1; then
     echo "→ MLflow tracking-store snapshot"
     docker run --rm -v "${PROJECT}_mlflowdata:/data:ro" -v "$BACKUP_DIR:/backup" alpine \
         tar czf "/backup/mlflow-$STAMP.tar.gz" -C /data .
 else
-    echo "→ MLflow volume absent — skipped"
+    echo "→ MLflow volume absent, skipped"
 fi
 
 echo "→ Pruning backups older than ${RETAIN_DAYS} days"

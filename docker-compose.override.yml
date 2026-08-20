@@ -1,4 +1,4 @@
-# Local dev conveniences — automatically merged by `docker compose` on top of
+# Local dev conveniences, automatically merged by `docker compose` on top of
 # docker-compose.yml. Publishes ports to the host; not used in production.
 services:
   api:

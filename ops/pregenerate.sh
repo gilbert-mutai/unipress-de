@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# UniPress DE — pre-generate the demo outputs (docs/08 P6 "demo safety").
+# UniPress DE, pre-generate the demo outputs (docs/08 P6 "demo safety").
 #
 # Generates all five output types in both languages for a document, so that on
 # demo day every combination a judge can click is already in the database. The
 # API returns an existing output as an already-complete job (see
 # GenerateRequest.refresh), so those clicks resolve in one round trip with no
-# model call — no live rate-limit or latency risk in front of an audience.
+# model call, no live rate-limit or latency risk in front of an audience.
 #
 #   ops/pregenerate.sh <document_id>                  # fresh LLM outputs (default)
 #   ops/pregenerate.sh <document_id> --reuse          # skip combinations already present
@@ -34,7 +34,7 @@ jqp() { python3 -c "import sys,json; d=json.load(sys.stdin); print($1)" 2>/dev/n
 # Fail early on a bad document rather than 10 times over.
 status="$(curl -fsS --max-time 20 "$API/documents/$DOC" | jqp "d.get('status','?')")"
 if [[ $status != done ]]; then
-    echo "✗ document $DOC is '$status', not 'done' — ingest it first" >&2
+    echo "✗ document $DOC is '$status', not 'done', ingest it first" >&2
     exit 1
 fi
 echo "Document $DOC (refresh=$REFRESH) via $API"
@@ -92,4 +92,4 @@ done
 echo
 echo "generated=$made reused=$reused failed=$fails"
 ((fails == 0)) || exit 1
-echo "✓ every combination is now warm — demo clicks need no model call"
+echo "✓ every combination is now warm, demo clicks need no model call"

@@ -9,8 +9,8 @@ that could, rather than counting as zero support:
 - `quote_overlap` is meaningless when the output language differs from the source's.
   A Hungarian sentence shares almost no content words with an English quote, so the
   term scored ~0 for every Hungarian sentence and cost it roughly a third of the
-  blend. That is absence of measurement, not evidence of ungroundedness — and it
-  is why Hungarian outputs ran 0.38–0.62 against English's 0.58–0.89 on the same
+  blend. That is absence of measurement, not evidence of ungroundedness, and it
+  is why Hungarian outputs ran 0.38-0.62 against English's 0.58-0.89 on the same
   claims. Redistribution cannot invent support: if entailment and the judge are
   both low, the renormalised score stays low.
 

@@ -11,7 +11,7 @@ const VERDICT: Record<string, string> = {
 
 // Truncate rather than round, so a confidence never displays higher than it is.
 // Rounding put 0.445 on screen as "0.45" next to an UNSUPPORTED verdict, while the
-// INTERPRETATION threshold is 0.45 — making a correct verdict look like a bug.
+// INTERPRETATION threshold is 0.45, making a correct verdict look like a bug.
 function floor2(value: number): string {
   return (Math.floor(value * 100) / 100).toFixed(2);
 }

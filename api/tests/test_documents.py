@@ -57,7 +57,7 @@ def test_page_image_zoom_yields_a_larger_render(client: TestClient) -> None:
     assert base.status_code == high.status_code == 200
     assert len(high.content) > len(base.content)
 
-    # Out-of-range values are clamped, not rejected — a stray value must never
+    # Out-of-range values are clamped, not rejected, a stray value must never
     # break the panel or let a caller demand an enormous render.
     huge = client.get(f"/documents/{doc['id']}/pages/1.png", params={"zoom": 99})
     assert huge.status_code == 200

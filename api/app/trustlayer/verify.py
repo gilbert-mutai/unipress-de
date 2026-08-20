@@ -51,7 +51,7 @@ def _assess(
 ) -> Assessment:
     """Verify one piece of factual text against the claims it cites.
 
-    `soften` caps the result at INTERPRETATION — used for sentences the generator
+    `soften` caps the result at INTERPRETATION, used for sentences the generator
     tagged INTERPRETATION rather than FACT. Titles are not softened.
     """
     s = get_settings()
@@ -134,7 +134,7 @@ def verify_output(
     claims_by_key: dict[str, ClaimEvidence],
     on_sentence: Callable[[], None] | None = None,
 ) -> None:
-    """Mutate each sentence — and the title — with a verdict, confidence, rationale.
+    """Mutate each sentence: and the title, with a verdict, confidence, rationale.
 
     `on_sentence` fires after each sentence so a caller can report progress: with
     the Tier-2 judge enabled this loop makes a model call per gated sentence and is

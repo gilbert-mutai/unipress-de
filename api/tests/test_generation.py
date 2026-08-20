@@ -193,3 +193,11 @@ def test_generation_reports_real_progress(client: TestClient) -> None:
     checked = [d for _, d in seen if d.startswith("checking sentence ")]
     assert len(checked) >= 2, f"expected per-sentence reports, got {[d for _, d in seen]}"
     assert "of" in checked[-1]
+
+
+def test_style_rule_forbids_dashes_in_generated_text() -> None:
+    """Em dashes in published copy read as machine-written, so the prompt bans them."""
+    from app.generation.llm_generator import _STYLE_RULE
+
+    assert "em dash" in _STYLE_RULE.lower()
+    assert "en dash" in _STYLE_RULE.lower()

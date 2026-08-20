@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Retrieval A/B — compare embedding backends on probe queries (docs/01 §1c tail, docs/05 §3).
+"""Retrieval A/B: compare embedding backends on probe queries (docs/01 §1c tail, docs/05 §3).
 
 Embeds one document's chunks with each configured backend/model, runs a small set of
 labelled probe queries, and scores retrieval with hit@k + mean reciprocal rank (MRR).
@@ -10,7 +10,7 @@ number rather than an assertion. This closes the deferred P1 A/B tail.
     # runnable anywhere (no model download): the deterministic hashing baseline
     python eval/retrieval_ab.py --arms hashing
 
-    # the real comparison (needs the models / HF cache — run on the VM)
+    # the real comparison (needs the models / HF cache, run on the VM)
     python eval/retrieval_ab.py --arms intfloat/multilingual-e5-small BAAI/bge-m3 --mlflow
 
 Each ``--arms`` value is either ``hashing`` (the deterministic stub) or a
@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(REPO / "api"))
 
 # The fixture paper + its probe queries. Each probe names a substring that a
-# relevant chunk must contain — the ground-truth relevance label.
+# relevant chunk must contain, the ground-truth relevance label.
 from run_eval import _setup_infra, _ingest, _synthetic_pdf  # noqa: E402
 
 PROBES: list[dict[str, str]] = [

@@ -1,4 +1,4 @@
-"""Alembic environment — URL and metadata come from the app, not duplicated config."""
+"""Alembic environment: URL and metadata come from the app, not duplicated config."""
 
 from __future__ import annotations
 
