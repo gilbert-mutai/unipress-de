@@ -26,6 +26,7 @@ import {
 } from "./icons";
 import { Button } from "./ui/button";
 import { Chip, VerdictBadge } from "./ui/badge";
+import { ConfirmModal } from "./ui/modal";
 
 export default function EvidenceReview({
   output,
@@ -47,6 +48,7 @@ export default function EvidenceReview({
   );
   const [copied, setCopied] = useState<"text" | "cited" | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [zoom, setZoom] = useState(1);
   // An omitted claim has no sentence to select, so the evidence panel can also be
   // focused on a claim key directly, that is how a reviewer inspects what was
@@ -112,7 +114,7 @@ export default function EvidenceReview({
   };
 
   const clearAll = async () => {
-    if (!window.confirm("Discard every accept, flag and edit on this output?")) return;
+    setConfirmClear(false);
     const before = decisions;
     setDecisions({});
     try {
@@ -159,6 +161,28 @@ export default function EvidenceReview({
 
   return (
     <div>
+      <ConfirmModal
+        open={confirmClear}
+        title="Clear this review?"
+        body={
+          <>
+            This discards {counts.accepted + counts.flagged} decision
+            {counts.accepted + counts.flagged === 1 ? "" : "s"} and any edits on this output.
+            {counts.flagged > 0 && (
+              <>
+                {" "}
+                The {counts.flagged} flagged sentence
+                {counts.flagged === 1 ? "" : "s"} will return to the published copy.
+              </>
+            )}{" "}
+            The generated text itself is not affected.
+          </>
+        }
+        confirmLabel="Clear review"
+        onConfirm={clearAll}
+        onCancel={() => setConfirmClear(false)}
+      />
+
       {output.coverage?.warnings?.length ? (
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
           <button
@@ -248,8 +272,8 @@ export default function EvidenceReview({
               deliverable permanently short of the sentences it flagged. */}
           {counts.accepted + counts.flagged > 0 && (
             <button
-              onClick={clearAll}
-              className="underline decoration-dotted hover:text-ink"
+              onClick={() => setConfirmClear(true)}
+              className="whitespace-nowrap font-medium text-amber-700 underline decoration-dotted hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300"
               title="Discard every decision and edit on this output"
             >
               Clear reviews
