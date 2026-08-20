@@ -3,7 +3,7 @@
 Celery runs tasks in prefork child processes, so the stage/LLM metrics are recorded
 across several processes. Prometheus' multiprocess mode (PROMETHEUS_MULTIPROC_DIR)
 has each process write to a shared dir; the main worker process then serves the
-aggregated registry on WORKER_METRICS_PORT. All best-effort — a failure here must
+aggregated registry on WORKER_METRICS_PORT. All best-effort, a failure here must
 never stop the worker from processing tasks.
 
 Requires PROMETHEUS_MULTIPROC_DIR to be set in the environment *before* the metric

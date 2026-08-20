@@ -1,4 +1,4 @@
-"""LiteLLM gateway — the single choke point for all LLM calls (docs/07 §2.4).
+"""LiteLLM gateway: the single choke point for all LLM calls (docs/07 §2.4).
 
 Provider-agnostic (OpenAI default, Ollama swappable), with centralized retry and
 timeout. Implements the `LLMGateway` port. `litellm` is imported lazily so the

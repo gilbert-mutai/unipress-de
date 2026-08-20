@@ -1,6 +1,6 @@
 """Render a source PDF page to PNG, optionally highlighting a cited span.
 
-Powers the review UI's "see the real paper with the exact quote glowing" panel —
+Powers the review UI's "see the real paper with the exact quote glowing" panel,
 the strongest traceability visual. Rendering server-side (PyMuPDF) keeps the
 frontend simple (just an <img>) and lets us draw the highlight precisely from the
 stored bbox (page coordinates in PDF points).
@@ -15,7 +15,7 @@ from app.core.db import session_scope
 from app.db_models import Document
 
 _ZOOM = 2.0  # default: crisp at the panel's display size
-_MAX_ZOOM = 4.0  # bounded — render cost and payload both grow with the square
+_MAX_ZOOM = 4.0  # bounded, render cost and payload both grow with the square
 _HL_STROKE = (0.85, 0.45, 0.05)  # amber border
 _HL_FILL = (1.0, 0.86, 0.30)  # amber fill
 

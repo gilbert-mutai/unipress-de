@@ -36,7 +36,7 @@ export interface JobRead {
   stage: string;
   result: string | null;
   error: string | null;
-  /** Worker-reported completion, 0–100, and the phase it is in. */
+  /** Worker-reported completion, 0-100, and the phase it is in. */
   progress?: number | null;
   detail?: string | null;
 }
@@ -103,10 +103,10 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Upload a PDF, reporting transfer progress (0–1) when the browser can measure it.
+/** Upload a PDF, reporting transfer progress (0-1) when the browser can measure it.
  *
  * Uses XMLHttpRequest rather than fetch: fetch cannot report *upload* progress, and
- * on a slow link the transfer is the whole wait — a 2.5 MB paper took 12–57s from
+ * on a slow link the transfer is the whole wait, a 2.5 MB paper took 12-57s from
  * Europe to this host, against ~0.15s of server-side work. Without progress the
  * screen simply sits there, which is the worst thing it can do in a demo.
  */
@@ -149,7 +149,7 @@ export function uploadDocument(
       }
     };
     xhr.onerror = () =>
-      reject(new Error("Upload failed — the connection dropped or timed out."));
+      reject(new Error("Upload failed, the connection dropped or timed out."));
     xhr.onabort = () => reject(new Error("Upload cancelled."));
     xhr.send(form);
   });
@@ -193,6 +193,13 @@ export function renderUrl(
   view: "publish" | "evidence" = "evidence",
 ): string {
   return `${API_BASE}/documents/outputs/${outputId}/render?format=${format}&view=${view}`;
+}
+
+/** Discard every decision and edit on an output, restoring the generated text. */
+export async function clearReviews(outputId: string): Promise<OutputDetail> {
+  return json(
+    await fetch(`${API_BASE}/documents/outputs/${outputId}/reviews`, { method: "DELETE" }),
+  );
 }
 
 /** Record the reviewer's ruling on one sentence so it outlives the tab. */

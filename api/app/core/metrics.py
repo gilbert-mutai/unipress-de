@@ -1,4 +1,4 @@
-"""Prometheus metrics — the app-specific series behind the Grafana board (docs/05 §7, docs/07 §2.8).
+"""Prometheus metrics: the app-specific series behind the Grafana board (docs/05 §7, docs/07 §2.8).
 
 Registered on the default registry, so they appear on the api's `/metrics` (via the
 instrumentator) and on the worker's own metrics server. Four families back the
@@ -26,7 +26,7 @@ STAGE_SECONDS = Histogram(
 STAGE_TOTAL = Counter("unipress_stage_total", "Pipeline stage runs", ["stage", "status"])
 
 # LLM accounting (the hybrid-cost argument, docs/05 §3.5). Populated only when an LLM
-# path is enabled — the default deterministic pipeline makes no calls, so these stay 0.
+# path is enabled, the default deterministic pipeline makes no calls, so these stay 0.
 LLM_TOKENS = Counter("unipress_llm_tokens_total", "LLM tokens", ["model", "kind"])
 LLM_COST_USD = Counter("unipress_llm_cost_usd_total", "Estimated LLM cost (USD)", ["model"])
 
@@ -101,7 +101,7 @@ class QueueDepthCollector:
     """Per-scrape collector for Celery queue depth (pending tasks).
 
     Celery-on-Redis stores pending tasks as a list keyed by queue name; LLEN is its
-    depth. Computed live on each scrape and best-effort — a scrape still succeeds if
+    depth. Computed live on each scrape and best-effort, a scrape still succeeds if
     Redis is unreachable (the series is simply absent that scrape).
     """
 

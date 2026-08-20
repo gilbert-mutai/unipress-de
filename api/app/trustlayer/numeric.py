@@ -1,4 +1,4 @@
-"""Numeric verification — the single highest-value trust check (docs/03 §5.4).
+"""Numeric verification: the single highest-value trust check (docs/03 §5.4).
 
 Numbers are the #1 hallucination risk, so every number in a generated sentence
 must be corroborated by a number in the cited source span (within a small
@@ -10,7 +10,7 @@ decimals with a comma ("88,8%") while the English source papers use a point
 fired CONTRADICTED on correct Hungarian sentences. Where a token is genuinely
 ambiguous ("1,234" is 1234 in English, 1.234 in Hungarian) both readings are kept,
 and a mismatch is reported only when *no* reading of the sentence's number matches
-*any* reading in the premise — this check must never accuse a faithful sentence
+*any* reading in the premise, this check must never accuse a faithful sentence
 over a punctuation convention.
 """
 
@@ -27,7 +27,7 @@ _THOUSANDS = re.compile(r"\d{1,3}(?:,\d{3})+")  # 1,234 / 12,345,678
 _DECIMAL_COMMA = re.compile(r"\d+,\d{1,3}")  # 88,8 / 0,05
 
 # Small spelled-out numbers, EN + HU. Papers write "nine networks" while a
-# generated sentence — especially a translated one — writes "9", so the *premise*
+# generated sentence, especially a translated one, writes "9", so the *premise*
 # is read with these expanded to digits, widening what counts as corroboration.
 #
 # Deliberately one-directional. Normalising the sentence too invents numeric
@@ -144,6 +144,6 @@ def numeric_mismatch(sentence: str, premise: str) -> bool:
     sentence_nums = _all_variants(sentence)
     if not sentence_nums:
         return False
-    # Only the premise gets spelled-out numbers expanded — see _WORD_NUMBERS.
+    # Only the premise gets spelled-out numbers expanded, see _WORD_NUMBERS.
     premise_nums = [v for variants in _all_variants(_with_word_numbers(premise)) for v in variants]
     return any(not _matches(values, premise_nums) for values in sentence_nums)

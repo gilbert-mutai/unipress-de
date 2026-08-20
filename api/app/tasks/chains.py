@@ -1,7 +1,7 @@
 """Celery chains: the real ingestion and generation pipelines.
 
 The Phase 0 demo chain (a Job walked through stand-in stages with no document)
-was removed along with its only caller, POST /jobs — everything here now
+was removed along with its only caller, POST /jobs, everything here now
 operates on a real document.
 """
 
@@ -128,7 +128,7 @@ def task_generate(job_id: str, document_id: str, output_type: str, language: str
 
     _set(job_id, status="processing", stage="generate", progress=2, detail="starting")
 
-    # One UPDATE per phase — a handful over a run that lasts tens of seconds, so
+    # One UPDATE per phase, a handful over a run that lasts tens of seconds, so
     # the cost is irrelevant beside a model call, and the UI gets a real number.
     def _report(percent: int, detail: str) -> None:
         _set(job_id, progress=percent, detail=detail)

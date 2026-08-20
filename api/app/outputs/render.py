@@ -15,7 +15,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.db_models import OutputRecord
-from app.outputs.manifest import attribution_for
+from app.outputs.manifest import citation_for
 
 _TEMPLATES = Path(__file__).parent / "templates"
 _env = Environment(
@@ -77,7 +77,7 @@ def render_publish_html(record: OutputRecord, source_filename: str) -> str:
         sections=[
             (section, list(group)) for section, group in groupby(sentences, key=lambda s: s.section)
         ],
-        attribution=attribution_for(source_filename),
+        citation=citation_for(source_filename),
     )
 
 
@@ -95,7 +95,7 @@ def render_html(record: OutputRecord, source_filename: str) -> str:
         is_video=record.output_type == "VIDEO_SCRIPT",
         scenes=sorted(record.sentences, key=lambda s: s.order_index),
         sections=_sections(record),
-        attribution=attribution_for(source_filename),
+        citation=citation_for(source_filename),
     )
 
 

@@ -26,5 +26,5 @@ class Claim(BaseModel):
     claim_type: ClaimType
     span: SourceSpan  # provenance (quote-verified)
     entities: list[str] = Field(default_factory=list)
-    importance: float = 0.5  # 0–1, for coverage weighting
+    importance: float = 0.5  # 0-1, for coverage weighting
     numeric: bool = False  # contains a number/statistic (higher scrutiny)

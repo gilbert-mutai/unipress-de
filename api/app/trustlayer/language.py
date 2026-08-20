@@ -3,7 +3,7 @@
 Only needed to decide whether a lexical comparison between a generated sentence
 and its cited quote is meaningful at all (see scorer.confidence). The corpus is
 Hungarian and English, so a cheap script-and-function-word test is enough and
-costs nothing per sentence — `documents.language` exists in the schema but has
+costs nothing per sentence, `documents.language` exists in the schema but has
 never been populated, and adding a detection dependency for a binary decision
 would be disproportionate.
 """

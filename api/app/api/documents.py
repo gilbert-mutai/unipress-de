@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
+from app.core.logging import get_logger
 from app.db_models import Chunk, Claim, Document, Job, OutputRecord, SentenceRecord
 from app.models import (
     ChunkRead,
@@ -28,6 +29,7 @@ from app.ports import Storage
 from .deps import get_storage
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+log = get_logger("api.documents")
 
 _MAX_BYTES = 30 * 1024 * 1024  # 30 MB upload cap
 _dispatch = CeleryTaskDispatch()
@@ -37,7 +39,7 @@ _STAGE_PROGRESS = {"queued": 5, "parse": 25, "chunk": 45, "extract": 65, "embed"
 
 
 def _with_progress(doc: Document, db: Session) -> DocumentRead:
-    """Build a DocumentRead with the latest ingestion stage + a 0–100 progress."""
+    """Build a DocumentRead with the latest ingestion stage + a 0-100 progress."""
     job = db.scalars(
         select(Job).where(Job.document_id == doc.id).order_by(Job.created_at.desc())
     ).first()
@@ -123,7 +125,7 @@ def get_page_image(
 ) -> Response:
     """Render a source PDF page as PNG, optionally highlighting a cited span (x0,y0,x1,y1).
 
-    `zoom` (1–4) sets the render resolution; the review UI raises it when the
+    `zoom` (1-4) sets the render resolution; the review UI raises it when the
     reviewer magnifies, so small print resolves instead of blurring.
     """
     if db.get(Document, document_id) is None:
@@ -196,7 +198,7 @@ def generate_output(
     # Demo safety (docs/08 P6): an output already generated for this
     # (document, type, language) is returned as an already-complete job, so the
     # UI resolves it in one round trip with no model call. That removes live
-    # rate-limit and latency risk from the demo path — the durable outputs table
+    # rate-limit and latency risk from the demo path, the durable outputs table
     # *is* the cache, rather than a second copy in Redis that can disagree with
     # it. `refresh=true` forces a fresh generation.
     if not payload.refresh:
@@ -255,6 +257,31 @@ def get_output(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
     return output
 
 
+@router.delete("/outputs/{output_id}/reviews", response_model=OutputDetail)
+def clear_reviews(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
+    """Discard every decision and edit on this output, restoring the generated text.
+
+    Decisions persist, which is what makes the published copy trustworthy, but it
+    also means a rehearsal or a trial run leaves flags behind and quietly shortens
+    the deliverable. Resetting had to be done in the database by hand; this makes
+    it an action the reviewer owns.
+    """
+    output = db.get(OutputRecord, output_id)
+    if output is None:
+        raise HTTPException(status_code=404, detail="output not found")
+
+    cleared = 0
+    for sentence in output.sentences:
+        if sentence.decision is not None or sentence.edited_text is not None:
+            sentence.decision = None
+            sentence.edited_text = None
+            cleared += 1
+    db.commit()
+    db.refresh(output)
+    log.info("reviews.cleared", output_id=output_id, sentences=cleared)
+    return output
+
+
 @router.patch("/outputs/{output_id}/sentences/{order_index}", response_model=SentenceRead)
 def review_sentence(
     output_id: str,
@@ -302,7 +329,7 @@ def render_output(
 
     Two views, because they serve different readers. `evidence` (default, and what
     existed before) annotates every sentence with its verdict, confidence and cited
-    claims — the record for sign-off. `publish` is the deliverable: flagged
+    claims, the record for sign-off. `publish` is the deliverable: flagged
     sentences dropped, reviewer edits applied, no verdict furniture, attribution
     kept. Handing a newsroom the annotated version was the reason the tool had no
     directly usable output.

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""UniPress DE — evaluation harness (docs/05 §8).
+"""UniPress DE: evaluation harness (docs/05 §8).
 
 Runs the real pipeline end-to-end in-process (parse → chunk → extract → embed →
 generate → TrustLayer) on the sample papers, computes the docs/05 metrics per
 (paper × output type × language), and writes a timestamped JSON + Markdown report
 to ``eval/reports/``. By default it uses the deterministic fallback generator and
 throwaway infra (in-memory SQLite, hashing embedder, in-memory vector store) so a
-run needs no services, no API key, and is fully reproducible — the shape the CI
+run needs no services, no API key, and is fully reproducible, the shape the CI
 eval-gate depends on.
 
     python eval/run_eval.py                      # all EN research papers, all output types
@@ -101,7 +101,7 @@ def _ingest(db: Any, filename: str, data: bytes) -> str:
 
 # A committed-free, service-free fixture paper for the CI eval-gate: the real sample
 # PDFs are gitignored (licensing + size), so CI runs the harness on this synthetic,
-# claim-dense abstract built in-memory with PyMuPDF — the "small fixed set" of docs/05 §8.
+# claim-dense abstract built in-memory with PyMuPDF, the "small fixed set" of docs/05 §8.
 _SYNTHETIC_TEXT = (
     "Abstract\n\n"
     "We present a novel screening method for early cancer detection from routine imaging. "
@@ -356,7 +356,7 @@ def _write_report(report: dict[str, Any], label: str) -> Path:
 def _markdown(report: dict[str, Any]) -> str:
     agg = report["aggregate"]
     lines = [
-        f"# UniPress DE — eval report `{report['label'] or report['run_at']}`",
+        f"# UniPress DE, eval report `{report['label'] or report['run_at']}`",
         "",
         f"- Run at: {report['run_at']}",
         f"- Generator: {report['generator']}  ·  Papers: {len(report['papers'])}  "
@@ -375,8 +375,8 @@ def _markdown(report: dict[str, Any]) -> str:
         if val is None:  # e.g. gold-only metrics on a gold-less run
             continue
         c = checks.get(metric)
-        tgt = f"{c['op']} {c['target']}" if c else "—"
-        met = "✅" if c and c["met"] else ("❌" if c else "—")
+        tgt = f"{c['op']} {c['target']}" if c else "-"
+        met = "✅" if c and c["met"] else ("❌" if c else "-")
         lines.append(f"| {metric} | {val} | {tgt} | {met} |")
     lines += ["", "## Per output", "", "| Paper | Output | Lang | Halluc | Faith | Precision | Quality |",
               "|---|---|---|---|---|---|---|"]
@@ -420,7 +420,7 @@ def main() -> int:
     ap.add_argument("--outputs", nargs="*", default=DEFAULT_OUTPUTS, help="output types")
     ap.add_argument("--label", default="", help="report dir label")
     ap.add_argument("--synthetic", action="store_true",
-                    help="run on an in-memory fixture paper (no external PDFs — CI eval-gate)")
+                    help="run on an in-memory fixture paper (no external PDFs. CI eval-gate)")
     ap.add_argument("--fail-on-target-miss", action="store_true",
                     help="exit non-zero if a headline target is missed (CI eval-gate)")
     ap.add_argument("--mlflow", action="store_true", help="log the run to MLflow")

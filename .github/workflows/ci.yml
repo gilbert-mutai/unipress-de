@@ -90,7 +90,7 @@ jobs:
   # Requires three repository secrets: DEPLOY_HOST, DEPLOY_USER and DEPLOY_SSH_KEY
   # (a passphrase-less private key whose public half is in the server's
   # authorized_keys). The host key is pinned from ops/known_hosts, which is
-  # checked into the repo — host keys are public, and keeping them in a file makes
+  # checked into the repo, host keys are public, and keeping them in a file makes
   # the pin reviewable and immune to the host-string mismatch that fails silently
   # when a hashed secret was scanned for a different name than the one dialled.
   deploy:
@@ -118,7 +118,7 @@ jobs:
           printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keygen -y -f ~/.ssh/id_ed25519 -P "" >/dev/null 2>&1 \
-            || { echo "::error::DEPLOY_SSH_KEY is unusable — truncated, or passphrase-protected (CI cannot type a passphrase)"; exit 1; }
+            || { echo "::error::DEPLOY_SSH_KEY is unusable, truncated, or passphrase-protected (CI cannot type a passphrase)"; exit 1; }
           install -m 644 ops/known_hosts ~/.ssh/known_hosts
           # Fail with the reason rather than ssh's bare "Host key verification failed".
           ssh-keygen -F "$HOST" -f ~/.ssh/known_hosts >/dev/null \

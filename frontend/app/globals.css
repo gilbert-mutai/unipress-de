@@ -4,7 +4,7 @@
 
 @layer base {
   /* Palette borrowed from the University of Debrecen identity (unideb.hu):
-     deep green #054434 as the primary, gold #fbab2c as the accent — both taken
+     deep green #054434 as the primary, gold #fbab2c as the accent, both taken
      from the official mark in /public/ud-logo.svg. Green carries large surfaces
      (the header band); gold is used sparingly, as a rule or a badge, never as
      text on light backgrounds (it fails WCAG AA there). */
@@ -16,10 +16,10 @@
     --ink: 165 12% 14%;
     --muted: 160 8% 40%;
     --line: 155 14% 87%;
-    --brand: 165 87% 14%; /* #054434 — 11.6:1 on white */
+    --brand: 165 87% 14%; /* #054434-11.6:1 on white */
     --brand-fg: 150 30% 98%;
     --accent: 37 96% 58%; /* #fbab2c */
-    --accent-fg: 165 45% 12%; /* dark green text on gold — 8.9:1 */
+    --accent-fg: 165 45% 12%; /* dark green text on gold, 8.9:1 */
     /* The header band stays deep green in both themes, as on unideb.hu. */
     --header: 165 87% 13%;
     --header-fg: 150 25% 97%;

@@ -1,4 +1,4 @@
-"""Tier-2 LLM judge (docs/03 §5.2) — nuanced, explainable adjudication.
+"""Tier-2 LLM judge (docs/03 §5.2): nuanced, explainable adjudication.
 
 Opt-in (settings.llm_judge + a key). Called only for sentences Tier-1 can't
 settle cheaply (borderline entailment or any numeric statement), so most

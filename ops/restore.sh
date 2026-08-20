@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# UniPress DE — restore from an ops/backup.sh snapshot (docs/08 P6: "restore tested once").
+# UniPress DE, restore from an ops/backup.sh snapshot (docs/08 P6: "restore tested once").
 #
 #   ops/restore.sh --list                  # what is in $BACKUP_DIR
 #   ops/restore.sh --latest                # restore the newest stamp
@@ -16,8 +16,7 @@
 # --rehearse is how you check a backup without downtime: it verifies every
 # archive's integrity, loads the dump into a scratch database, compares its row
 # counts against the live one, then drops the scratch database. Nothing live is
-# touched and no service stops. That is enough to know the backups restore —
-# run it on a schedule; keep the destructive path for an actual recovery.
+# touched and no service stops. That is enough to know the backups restore, # run it on a schedule; keep the destructive path for an actual recovery.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."                     # repo root (compose file + .env live here)
@@ -68,7 +67,7 @@ for name in pg chroma storage mlflow; do
         echo "  ✓ $(basename "$f") ($(du -h "$f" | cut -f1))"
     else
         # An older backup predating the mlflow snapshot is expected, not fatal.
-        echo "  – $(basename "$f") missing → skipping $name"
+        echo ", $(basename "$f") missing → skipping $name"
         ONLY="${ONLY//$name/}"
         [[ $name == pg ]] && missing=1
     fi
@@ -80,7 +79,7 @@ if ((REHEARSE)); then
     SCRATCH="restore_rehearsal_$STAMP"
     SCRATCH="${SCRATCH//-/_}" # a stamp's hyphens are not valid unquoted in an identifier
     echo
-    echo "REHEARSAL — nothing live is modified, no service is stopped."
+    echo "REHEARSAL, nothing live is modified, no service is stopped."
 
     echo "→ Verifying archive integrity"
     for name in chroma storage mlflow; do
@@ -140,7 +139,7 @@ if ((REHEARSE)); then
     fi
 
     ((rc == 0)) || { echo "✗ rehearsal FAILED"; exit 1; }
-    echo "✓ rehearsal passed — stamp $STAMP restores cleanly"
+    echo "✓ rehearsal passed, stamp $STAMP restores cleanly"
     exit 0
 fi
 

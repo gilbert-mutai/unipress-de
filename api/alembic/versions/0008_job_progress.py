@@ -2,7 +2,7 @@
 
 Generation reported a single stage, so the UI could only show an indeterminate
 spinner for what is often a minute of work. The worker now reports real
-sub-phases — writing, verifying sentence n of m, scoring coverage — and this
+sub-phases, writing, verifying sentence n of m, scoring coverage, and this
 column carries the resulting 0-100 so the percentage on screen reflects work
 actually completed rather than elapsed time.
 

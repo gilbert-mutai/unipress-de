@@ -3,7 +3,7 @@
 Born-digital PDFs give us positional text (bbox) directly, which is what the UI
 needs to highlight a source span. Scanned/image-only pages are detected and
 flagged as a warning rather than silently producing empty text (OCR is out of
-MVP scope — see docs/03 §7).
+MVP scope, see docs/03 §7).
 """
 
 from __future__ import annotations

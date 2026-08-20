@@ -16,7 +16,7 @@ from app.generation.specs import get_spec
 from app.trustlayer.coverage import coverage_report
 from app.trustlayer.verify import ClaimEvidence, verify_output
 
-# (percent 0-100, short human phase) — reported from the work, not a timer.
+# (percent 0-100, short human phase), reported from the work, not a timer.
 ProgressFn = Callable[[int, str], None]
 
 log = get_logger("generation.service")
@@ -60,7 +60,7 @@ def generate_output(
 
     `on_progress(percent, detail)` is called as the work proceeds. The two slow
     parts are the model writing the draft and the TrustLayer checking each
-    sentence, and the latter is reported per sentence — with an LLM judge in the
+    sentence, and the latter is reported per sentence, with an LLM judge in the
     loop it can be the longer half, and a reviewer waiting deserves to see it move.
     """
     report = on_progress or (lambda _pct, _detail: None)

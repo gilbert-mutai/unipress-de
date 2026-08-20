@@ -1,8 +1,8 @@
 """Ingestion data contracts (Pydantic).
 
-`SourceSpan` follows docs/03 §1.1 — it is the traceability backbone: every chunk
+`SourceSpan` follows docs/03 §1.1, it is the traceability backbone: every chunk
 (and later, every claim) carries the exact page/section/offset/quote/bbox so the
-UI can highlight the source. `Claim`/`GeneratedSentence` (docs/03 §1.2–1.3) arrive
+UI can highlight the source. `Claim`/`GeneratedSentence` (docs/03 §1.2-1.3) arrive
 with the claim-extraction slice (Phase 1b).
 """
 

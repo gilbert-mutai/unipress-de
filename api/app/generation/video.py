@@ -1,7 +1,7 @@
 """Deterministic 60-second video script as a timed scene table (docs/04 §6).
 
-Maps verified claims onto a fixed narrative arc — hook → context → finding →
-meaning → CTA — each scene carrying narration (spoken), on-screen text, a visual
+Maps verified claims onto a fixed narrative arc, hook → context → finding →
+meaning → CTA, each scene carrying narration (spoken), on-screen text, a visual
 suggestion, a timecode, and claim citations. Narration is a claim rendered
 verbatim (so it's grounded and verifiable); the LLM path rewrites it into
 spoken-word cadence behind the same contract.
@@ -19,18 +19,18 @@ from app.generation.models import GeneratedOutput, GeneratedSentence, OutputType
 _SCENES: list[tuple[str, str, list[str], str]] = [
     (
         "hook",
-        "0:00–0:05",
+        "0:00-0:05",
         [ClaimType.QUANTITATIVE, ClaimType.FINDING],
         "Title card + striking stat",
     ),
-    ("context", "0:05–0:20", [ClaimType.BACKGROUND, ClaimType.METHOD], "B-roll: the problem"),
+    ("context", "0:05-0:20", [ClaimType.BACKGROUND, ClaimType.METHOD], "B-roll: the problem"),
     (
         "finding",
-        "0:20–0:45",
+        "0:20-0:45",
         [ClaimType.FINDING, ClaimType.QUANTITATIVE],
         "Show the key figure/result",
     ),
-    ("meaning", "0:45–0:55", [ClaimType.FINDING, ClaimType.LIMITATION], "Impact visual"),
+    ("meaning", "0:45-0:55", [ClaimType.FINDING, ClaimType.LIMITATION], "Impact visual"),
 ]
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?%?")
 
@@ -79,13 +79,13 @@ def build_video_scenes(claims: list[ClaimInput], language: str, title_hint: str)
             )
         )
 
-    # Closing call-to-action — framing, not a factual claim.
+    # Closing call-to-action, framing, not a factual claim.
     sentences.append(
         GeneratedSentence(
-            text="Read the full study — every figure and number is in the paper.",
+            text="Read the full study, every figure and number is in the paper.",
             role=SentenceRole.RHETORICAL,
             section="cta",
-            timecode="0:55–1:00",
+            timecode="0:55-1:00",
             on_screen="Read the paper",
             visual="End card: title + DOI",
         )

@@ -1,4 +1,4 @@
-"""In-memory brute-force vector store — used by tests and single-process local runs.
+"""In-memory brute-force vector store: used by tests and single-process local runs.
 
 Not shared across processes, so compose uses Chroma instead. Kept because it lets
 the whole retrieval path run with zero external services.

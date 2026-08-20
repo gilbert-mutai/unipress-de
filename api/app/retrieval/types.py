@@ -1,4 +1,4 @@
-"""Lightweight retrieval types (no heavy imports — safe for the ports module)."""
+"""Lightweight retrieval types (no heavy imports: safe for the ports module)."""
 
 from __future__ import annotations
 

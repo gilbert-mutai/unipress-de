@@ -1,8 +1,8 @@
-# UniPress DE — production overlay: public entry via nginx + Certbot TLS.
+# UniPress DE, production overlay: public entry via nginx + Certbot TLS.
 # Enable by pinning both files in .env (server only):
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
 # The dev docker-compose.override.yml (host port publishing) is intentionally NOT used
-# in production — only nginx is public (80/443).
+# in production, only nginx is public (80/443).
 
 services:
   # Build the frontend for single-origin: browser calls go to /api (same host),
@@ -15,7 +15,7 @@ services:
 
   # nginx strips the /api prefix before proxying, so the app is mounted at /api
   # from the browser's point of view. FastAPI needs to know that to build correct
-  # absolute links — otherwise /api/docs requests the schema from /openapi.json
+  # absolute links, otherwise /api/docs requests the schema from /openapi.json
   # at the site root, which nginx routes to the frontend (404).
   api:
     environment:

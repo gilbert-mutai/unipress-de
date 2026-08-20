@@ -1,4 +1,4 @@
-# Frozen gold set — pap_smear_screening (docs/05 §2). Human-verified; do NOT tune against it.
+# Frozen gold set, pap_smear_screening (docs/05 §2). Human-verified; do NOT tune against it.
 # Key facts are the must-not-miss findings (claim keys as emitted by extraction).
 # Adversarial traps are numeric overclaims each verified to be caught by the TrustLayer.
 paper_id: pap_smear_screening

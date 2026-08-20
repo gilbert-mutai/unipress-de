@@ -12,7 +12,7 @@ const STAGE_LABEL: Record<string, string> = {
 function Stat({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="rounded-xl border border-line bg-paper px-4 py-3 text-center">
-      <div className="font-serif text-2xl font-semibold tabular-nums">{value ?? "—"}</div>
+      <div className="font-serif text-2xl font-semibold tabular-nums">{value ?? "-"}</div>
       <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
     </div>
   );

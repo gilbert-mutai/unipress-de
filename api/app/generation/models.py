@@ -1,4 +1,4 @@
-"""Generation + verification contracts (docs/03 §1.3–1.4, docs/04)."""
+"""Generation + verification contracts (docs/03 §1.3-1.4, docs/04)."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ class GeneratedSentence(BaseModel):
     claim_ids: list[str] = Field(default_factory=list)  # claim keys, e.g. ["clm_003"]
     section: str | None = None  # structure slot (headline/lead/body/caveat, or a video scene)
     # Video-script scene metadata (None for prose outputs):
-    timecode: str | None = None  # e.g. "0:20–0:45"
+    timecode: str | None = None  # e.g. "0:20-0:45"
     on_screen: str | None = None  # short on-screen text
     visual: str | None = None  # visual suggestion, e.g. "show Figure 2"
     # Filled by the TrustLayer:

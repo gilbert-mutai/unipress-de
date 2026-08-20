@@ -1,4 +1,4 @@
-"""Deterministic claim-bound generator — no LLM required.
+"""Deterministic claim-bound generator: no LLM required.
 
 Composes a structured output directly from the verified claim store: each factual
 sentence is a claim rendered verbatim and cites that claim's key, so the output is

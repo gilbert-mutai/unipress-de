@@ -26,7 +26,7 @@ class JobRead(BaseModel):
     document_id: str | None = None
     result: str | None = None
     error: str | None = None
-    # Worker-reported: 0–100 and a short phase ("checking sentence 7 of 12").
+    # Worker-reported: 0-100 and a short phase ("checking sentence 7 of 12").
     progress: int | None = None
     detail: str | None = None
     created_at: datetime
@@ -40,7 +40,7 @@ class DocumentRead(BaseModel):
     filename: str
     status: JobStatus
     stage: str | None = None  # latest pipeline stage (parse/chunk/extract/embed/done)
-    progress: int | None = None  # 0–100, derived from the stage
+    progress: int | None = None  # 0-100, derived from the stage
     page_count: int | None = None
     chunk_count: int | None = None
     claim_count: int | None = None
@@ -102,7 +102,7 @@ class GenerateRequest(BaseModel):
     output_type: str = Field(default="PRESS_RELEASE")
     language: str = Field(default="en", pattern="^(en|hu)$")
     # Reuse an existing output for this (document, type, language) when one
-    # exists — the demo-safety path. Set true to force a new generation.
+    # exists, the demo-safety path. Set true to force a new generation.
     refresh: bool = Field(default=False)
 
 
@@ -129,7 +129,7 @@ class SentenceReview(BaseModel):
     """A reviewer's ruling on one sentence.
 
     Both fields are optional and only applied when present, so a client can set a
-    decision without touching an edit — and can clear a decision by sending null,
+    decision without touching an edit, and can clear a decision by sending null,
     which is distinguishable from omitting it.
     """
 

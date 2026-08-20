@@ -1,4 +1,4 @@
-"""Hexagonal ports — the interfaces infrastructure must satisfy.
+"""Hexagonal ports: the interfaces infrastructure must satisfy.
 
 The domain depends on these Protocols, never on concrete infra, so Chroma,
 OpenAI, S3, or Celery are swappable adapters. Phase 0 ships stub adapters

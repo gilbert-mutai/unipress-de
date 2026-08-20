@@ -1,6 +1,6 @@
 # worker/
 
-The Celery worker currently **shares the `api/` image** — the `worker` and `flower`
+The Celery worker currently **shares the `api/` image**: the `worker` and `flower`
 services in `docker-compose.yml` build from `./api` and only change the start command.
 There is no separate build here yet.
 
