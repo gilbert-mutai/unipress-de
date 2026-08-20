@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.stubs import CeleryTaskDispatch
 from app.core.db import get_db
+from app.core.logging import get_logger
 from app.db_models import Chunk, Claim, Document, Job, OutputRecord, SentenceRecord
 from app.models import (
     ChunkRead,
@@ -28,6 +29,7 @@ from app.ports import Storage
 from .deps import get_storage
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+log = get_logger("api.documents")
 
 _MAX_BYTES = 30 * 1024 * 1024  # 30 MB upload cap
 _dispatch = CeleryTaskDispatch()
@@ -252,6 +254,31 @@ def get_output(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
     output = db.get(OutputRecord, output_id)
     if output is None:
         raise HTTPException(status_code=404, detail="output not found")
+    return output
+
+
+@router.delete("/outputs/{output_id}/reviews", response_model=OutputDetail)
+def clear_reviews(output_id: str, db: Session = Depends(get_db)) -> OutputRecord:
+    """Discard every decision and edit on this output, restoring the generated text.
+
+    Decisions persist, which is what makes the published copy trustworthy, but it
+    also means a rehearsal or a trial run leaves flags behind and quietly shortens
+    the deliverable. Resetting had to be done in the database by hand; this makes
+    it an action the reviewer owns.
+    """
+    output = db.get(OutputRecord, output_id)
+    if output is None:
+        raise HTTPException(status_code=404, detail="output not found")
+
+    cleared = 0
+    for sentence in output.sentences:
+        if sentence.decision is not None or sentence.edited_text is not None:
+            sentence.decision = None
+            sentence.edited_text = None
+            cleared += 1
+    db.commit()
+    db.refresh(output)
+    log.info("reviews.cleared", output_id=output_id, sentences=cleared)
     return output
 
 

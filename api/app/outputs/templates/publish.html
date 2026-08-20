@@ -13,7 +13,8 @@
     h1 { font-size: 1.7rem; line-height: 1.25; margin-bottom: .3rem; }
     .kicker { text-transform: uppercase; letter-spacing: .06em; font-size: .7rem;
               color: #666; font-family: system-ui, sans-serif; margin-bottom: 1.4rem; }
-    p { margin: .7rem 0; }
+    p { margin: .7rem 0; text-align: justify; text-justify: inter-word;
+        hyphens: auto; }
     .section-label { text-transform: uppercase; letter-spacing: .05em; font-size: .68rem;
                      color: #999; font-family: system-ui, sans-serif; margin: 1.4rem 0 .2rem; }
     footer { margin-top: 2.4rem; padding-top: 1rem; border-top: 1px solid #ddd;
@@ -55,7 +56,7 @@
   {% endif %}
 
   <footer>
-    {{ attribution }}
+    <strong>Source:</strong> {{ citation }}
     <br />Prepared with UniPress DE — every statement was checked against the source before release.
   </footer>
 </body>

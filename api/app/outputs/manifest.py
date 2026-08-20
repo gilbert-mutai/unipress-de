@@ -43,3 +43,32 @@ def attribution_for(filename: str) -> dict[str, Any]:
         "license": entry.get("license"),
         "venue": entry.get("venue"),
     }
+
+
+def citation_for(filename: str) -> str:
+    """The source paper as one readable citation line.
+
+    Templates used to assemble this themselves, which meant two of them could
+    disagree, and one printed the raw dictionary because it interpolated the whole
+    mapping. Building the string once keeps both views identical and correct.
+
+    Reads as: Authors. Title. Venue. DOI. Licence.
+    """
+    a = attribution_for(filename)
+    parts: list[str] = []
+
+    authors = a.get("authors") or []
+    if authors:
+        listed = ", ".join(authors[:6])
+        parts.append(f"{listed}, et al." if len(authors) > 6 else f"{listed}.")
+
+    title = (a.get("title") or "").strip().rstrip(".")
+    if title:
+        parts.append(f"{title}.")
+
+    for field, label in (("venue", ""), ("doi", "DOI: "), ("license", "Licence: ")):
+        value = a.get(field)
+        if value:
+            parts.append(f"{label}{str(value).strip().rstrip('.')}.")
+
+    return " ".join(parts)

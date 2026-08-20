@@ -6,6 +6,7 @@ import {
   Decision,
   OutputDetail,
   pageImageUrl,
+  clearReviews,
   renderUrl,
   reviewSentence,
   SentenceRead,
@@ -107,6 +108,18 @@ export default function EvidenceReview({
         return copy;
       });
       setSaveError("Could not save that decision — check the connection and try again.");
+    }
+  };
+
+  const clearAll = async () => {
+    if (!window.confirm("Discard every accept, flag and edit on this output?")) return;
+    const before = decisions;
+    setDecisions({});
+    try {
+      await clearReviews(output.id);
+    } catch {
+      setDecisions(before);
+      setSaveError("Could not clear the reviews. Check the connection and try again.");
     }
   };
 
@@ -226,9 +239,22 @@ export default function EvidenceReview({
             <ExternalLink className="h-4 w-4" /> Evidence record
           </Button>
         </a>
-        <span className="ml-auto text-sm text-muted">
-          {counts.accepted} accepted · {counts.flagged} flagged
-          {counts.flagged ? " · excluded from the published copy" : ""}
+        <span className="ml-auto flex items-center gap-3 text-sm text-muted">
+          <span>
+            {counts.accepted} accepted · {counts.flagged} flagged
+            {counts.flagged ? " · excluded from the published copy" : ""}
+          </span>
+          {/* Decisions persist, so a rehearsal would otherwise leave the
+              deliverable permanently short of the sentences it flagged. */}
+          {counts.accepted + counts.flagged > 0 && (
+            <button
+              onClick={clearAll}
+              className="underline decoration-dotted hover:text-ink"
+              title="Discard every decision and edit on this output"
+            >
+              Clear reviews
+            </button>
+          )}
         </span>
       </div>
 

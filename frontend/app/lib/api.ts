@@ -195,6 +195,13 @@ export function renderUrl(
   return `${API_BASE}/documents/outputs/${outputId}/render?format=${format}&view=${view}`;
 }
 
+/** Discard every decision and edit on an output, restoring the generated text. */
+export async function clearReviews(outputId: string): Promise<OutputDetail> {
+  return json(
+    await fetch(`${API_BASE}/documents/outputs/${outputId}/reviews`, { method: "DELETE" }),
+  );
+}
+
 /** Record the reviewer's ruling on one sentence so it outlives the tab. */
 export async function reviewSentence(
   outputId: string,
