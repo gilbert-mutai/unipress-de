@@ -260,3 +260,74 @@ def test_citation_line_orders_the_fields(monkeypatch) -> None:
     ), line
     # An unknown file degrades to the filename rather than failing a render.
     assert manifest.citation_for("missing.pdf") == "missing.pdf."
+
+
+def test_evidence_record_keeps_the_generated_text_beside_an_edit(client: TestClient) -> None:
+    """The audit trail is the contrast: what the model wrote, and what went out."""
+    from tests.test_ingestion import make_pdf
+
+    paper = (
+        "1. Introduction\n\n"
+        "We propose a novel screening method for cervical cancer detection. "
+        "The system achieved 88.8% accuracy across 339 smears."
+    )
+    doc_id = client.post(
+        "/documents", files={"file": ("p.pdf", make_pdf([paper]), "application/pdf")}
+    ).json()["id"]
+    output_id = client.post(
+        f"/documents/{doc_id}/outputs", json={"output_type": "PRESS_RELEASE", "language": "en"}
+    ).json()["result"]
+
+    sentences = client.get(f"/documents/outputs/{output_id}").json()["sentences"]
+    target = sentences[1]
+    replacement = "A reviewer rewrote this line with care."
+    client.patch(
+        f"/documents/outputs/{output_id}/sentences/{target['order_index']}",
+        json={"edited_text": replacement},
+    )
+
+    evidence = client.get(
+        f"/documents/outputs/{output_id}/render", params={"view": "evidence"}
+    ).text
+    assert replacement in evidence, "the reviewer's wording should lead"
+    assert target["text"][:40] in evidence, "the generated original must remain on the record"
+    assert "edited" in evidence
+
+    publish = client.get(f"/documents/outputs/{output_id}/render", params={"view": "publish"}).text
+    assert replacement in publish
+    assert target["text"][:40] not in publish, "publish must not carry the superseded wording"
+
+
+def test_reverting_an_edit_restores_the_generated_wording(client: TestClient) -> None:
+    from tests.test_ingestion import make_pdf
+
+    doc_id = client.post(
+        "/documents",
+        files={
+            "file": (
+                "p.pdf",
+                make_pdf(
+                    [
+                        "1. Introduction\n\n"
+                        "We propose a novel screening method for cervical cancer detection. "
+                        "The system achieved 88.8% accuracy across 339 smears."
+                    ]
+                ),
+                "application/pdf",
+            )
+        },
+    ).json()["id"]
+    output_id = client.post(
+        f"/documents/{doc_id}/outputs", json={"output_type": "SOCIAL", "language": "en"}
+    ).json()["result"]
+    idx = client.get(f"/documents/outputs/{output_id}").json()["sentences"][0]["order_index"]
+
+    client.patch(
+        f"/documents/outputs/{output_id}/sentences/{idx}", json={"edited_text": "Rewritten."}
+    )
+    # An empty string means "no edit", not "publish an empty sentence".
+    r = client.patch(f"/documents/outputs/{output_id}/sentences/{idx}", json={"edited_text": "  "})
+    assert r.status_code == 200
+    assert r.json()["edited_text"] is None
+    publish = client.get(f"/documents/outputs/{output_id}/render", params={"view": "publish"}).text
+    assert "Rewritten." not in publish

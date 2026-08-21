@@ -12,15 +12,16 @@ import { Decision, OutputDetail, SentenceRead } from "./api";
  * The UI updates optimistically, so the copy and the character count must reflect
  * what the reviewer has just clicked rather than the last server response.
  */
-export function withDecisions(
+export function withReview(
   sentences: SentenceRead[],
   decisions: Record<number, Decision>,
+  edits: Record<number, string> = {},
 ): SentenceRead[] {
-  return sentences.map((s) =>
-    decisions[s.order_index] !== undefined
-      ? { ...s, decision: decisions[s.order_index] }
-      : { ...s, decision: null },
-  );
+  return sentences.map((s) => ({
+    ...s,
+    decision: decisions[s.order_index] ?? null,
+    edited_text: edits[s.order_index] ?? null,
+  }));
 }
 
 /** Sentences fit to publish, in order, with edits substituted for originals. */

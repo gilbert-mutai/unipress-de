@@ -108,3 +108,17 @@ export const Copy = (p: P) => (
     <path d="M5 15V5a2 2 0 0 1 2-2h8" />
   </svg>
 );
+
+export const Pencil = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+
+export const Undo = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M3 7v6h6" />
+    <path d="M3 13a9 9 0 1 0 3-7.7L3 8" />
+  </svg>
+);
