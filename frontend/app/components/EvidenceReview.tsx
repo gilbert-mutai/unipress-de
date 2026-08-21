@@ -11,7 +11,7 @@ import {
   reviewSentence,
   SentenceRead,
 } from "../lib/api";
-import { copyDeliverable, socialLength, withDecisions } from "../lib/deliverable";
+import { copyDeliverable, socialLength, withReview } from "../lib/deliverable";
 import { cn } from "../lib/utils";
 import {
   AlertTriangle,
@@ -22,7 +22,9 @@ import {
   Copy,
   Flag,
   Minus,
+  Pencil,
   Plus,
+  Undo,
 } from "./icons";
 import { Button } from "./ui/button";
 import { Chip, VerdictBadge } from "./ui/badge";
@@ -44,6 +46,11 @@ export default function EvidenceReview({
   const [decisions, setDecisions] = useState<Record<number, Decision>>(() =>
     Object.fromEntries(
       output.sentences.filter((s) => s.decision).map((s) => [s.order_index, s.decision as Decision]),
+    ),
+  );
+  const [edits, setEdits] = useState<Record<number, string>>(() =>
+    Object.fromEntries(
+      output.sentences.filter((x) => x.edited_text).map((x) => [x.order_index, x.edited_text as string]),
     ),
   );
   const [copied, setCopied] = useState<"text" | "cited" | null>(null);
@@ -74,6 +81,8 @@ export default function EvidenceReview({
     return rows;
   }, [output.coverage, claimsByKey]);
 
+  const editCount = Object.keys(edits).length;
+
   const counts = useMemo(
     () => ({
       accepted: Object.values(decisions).filter((d) => d === "accepted").length,
@@ -84,8 +93,8 @@ export default function EvidenceReview({
 
   // The published copy reflects decisions, so the count updates with them.
   const chars = useMemo(
-    () => socialLength({ ...output, sentences: withDecisions(output.sentences, decisions) }),
-    [output, decisions],
+    () => socialLength({ ...output, sentences: withReview(output.sentences, decisions, edits) }),
+    [output, decisions, edits],
   );
 
   /** Toggle a ruling, optimistically, then persist it. */
@@ -113,20 +122,42 @@ export default function EvidenceReview({
     }
   };
 
+  /** Store or clear a reviewer's rewrite. */
+  const editSentence = async (orderIndex: number, text: string | null) => {
+    const before = edits;
+    setEdits((e) => {
+      const next = { ...e };
+      if (text) next[orderIndex] = text;
+      else delete next[orderIndex];
+      return next;
+    });
+    try {
+      await reviewSentence(output.id, orderIndex, { edited_text: text });
+    } catch {
+      // The publish render reads the server, so a rewrite that only exists in
+      // the tab would be published as the original without warning.
+      setEdits(before);
+      setSaveError("Could not save that edit. Check the connection and try again.");
+    }
+  };
+
   const clearAll = async () => {
     setConfirmClear(false);
     const before = decisions;
+    const beforeEdits = edits;
     setDecisions({});
+    setEdits({});
     try {
       await clearReviews(output.id);
     } catch {
       setDecisions(before);
+      setEdits(beforeEdits);
       setSaveError("Could not clear the reviews. Check the connection and try again.");
     }
   };
 
   const copy = async (withCitations: boolean) => {
-    const shaped = { ...output, sentences: withDecisions(output.sentences, decisions) };
+    const shaped = { ...output, sentences: withReview(output.sentences, decisions, edits) };
     try {
       await copyDeliverable(shaped, withCitations);
       setCopied(withCitations ? "cited" : "text");
@@ -167,7 +198,11 @@ export default function EvidenceReview({
         body={
           <>
             This discards {counts.accepted + counts.flagged} decision
-            {counts.accepted + counts.flagged === 1 ? "" : "s"} and any edits on this output.
+            {counts.accepted + counts.flagged === 1 ? "" : "s"}
+            {editCount > 0
+              ? ` and ${editCount} edited sentence${editCount === 1 ? "" : "s"}`
+              : ""}
+            .
             {counts.flagged > 0 && (
               <>
                 {" "}
@@ -270,7 +305,7 @@ export default function EvidenceReview({
           </span>
           {/* Decisions persist, so a rehearsal would otherwise leave the
               deliverable permanently short of the sentences it flagged. */}
-          {counts.accepted + counts.flagged > 0 && (
+          {counts.accepted + counts.flagged + editCount > 0 && (
             <button
               onClick={() => setConfirmClear(true)}
               className="whitespace-nowrap font-medium text-amber-700 underline decoration-dotted hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300"
@@ -333,9 +368,11 @@ export default function EvidenceReview({
                 selected={s.order_index === selected}
                 accepted={decisions[s.order_index] === "accepted"}
                 flagged={decisions[s.order_index] === "flagged"}
+                edited={edits[s.order_index] ?? null}
                 onSelect={() => selectSentence(s.order_index)}
                 onAccept={() => rule(s.order_index, "accepted")}
                 onFlag={() => rule(s.order_index, "flagged")}
+                onEdit={(text) => editSentence(s.order_index, text)}
               />
             ))}
           </div>
@@ -451,19 +488,37 @@ function SentenceCard({
   selected,
   accepted,
   flagged,
+  edited,
   onSelect,
   onAccept,
   onFlag,
+  onEdit,
 }: {
   s: SentenceRead;
   selected: boolean;
   accepted: boolean;
   flagged: boolean;
+  /** The reviewer's replacement, or null when the generated text stands. */
+  edited: string | null;
   onSelect: () => void;
   onAccept: () => void;
   onFlag: () => void;
+  onEdit: (text: string | null) => void;
 }) {
   const blocked = s.verdict === "UNSUPPORTED" || s.verdict === "CONTRADICTED";
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(edited ?? s.text);
+
+  const shown = edited ?? s.text;
+
+  const commit = () => {
+    setEditing(false);
+    const next = draft.trim();
+    // Reverting to the generated wording is the same as having no edit at all,
+    // so it clears rather than storing a duplicate.
+    onEdit(!next || next === s.text.trim() ? null : next);
+  };
+
   return (
     <div
       onClick={onSelect}
@@ -481,9 +536,41 @@ function SentenceCard({
           {s.section && <span>{s.section}</span>}
         </div>
       )}
-      <p className={cn("text-[15px] leading-relaxed", flagged && "line-through opacity-50")}>
-        {s.text}
-      </p>
+      {editing ? (
+        <div onClick={(e) => e.stopPropagation()}>
+          <textarea
+            value={draft}
+            autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setDraft(shown);
+                setEditing(false);
+              }
+              // Enter saves; Shift+Enter keeps a line break for a video caption.
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                commit();
+              }
+            }}
+            rows={Math.max(2, Math.ceil(draft.length / 70))}
+            className="w-full resize-y rounded-lg border border-brand/40 bg-paper p-2 text-[15px] leading-relaxed text-ink outline-none ring-1 ring-brand/20"
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Enter saves, Escape cancels. The generated wording stays on the evidence record.
+          </p>
+        </div>
+      ) : (
+        <p className={cn("text-[15px] leading-relaxed", flagged && "line-through opacity-50")}>
+          {shown}
+        </p>
+      )}
+      {edited && !editing && (
+        <p className="mt-1 text-[11px] text-muted">
+          Edited by you. Generated: <span className="italic">{s.text}</span>
+        </p>
+      )}
       {(s.on_screen || s.visual) && (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
           {s.on_screen && (
@@ -516,7 +603,33 @@ function SentenceCard({
         {s.claim_ids?.length ? (
           <span className="font-mono text-[11px] text-brand">[{s.claim_ids.join(", ")}]</span>
         ) : null}
+        {edited && (
+          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+            edited
+          </span>
+        )}
         <div className="ml-auto flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => {
+              setDraft(shown);
+              setEditing(true);
+            }}
+            aria-label="Edit"
+            title="Rewrite this sentence"
+            className="flex h-6 w-6 items-center justify-center rounded-md bg-line/60 text-muted transition-colors hover:bg-line"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          {edited && (
+            <button
+              onClick={() => onEdit(null)}
+              aria-label="Revert"
+              title="Restore the generated wording"
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-line/60 text-muted transition-colors hover:bg-line"
+            >
+              <Undo className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button
             onClick={onAccept}
             aria-label="Accept"

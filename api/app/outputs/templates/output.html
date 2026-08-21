@@ -19,6 +19,10 @@
     .INTERPRETATION { background:#fef9c3; color:#854d0e; }
     .UNSUPPORTED, .CONTRADICTED { background:#fee2e2; color:#991b1b; }
     .RHETORICAL { background:#f1f5f9; color:#475569; }
+    .EDITED { background:#e0e7ff; color:#3730a3; }
+    .FLAGGED { background:#fee2e2; color:#991b1b; }
+    .generated { margin:.1rem 0 .5rem; padding-left:.6rem; border-left:2px solid #ddd;
+                 font-size:.78rem; color:#777; font-style:italic; }
     .titleverdict { margin: -.4rem 0 1rem; }
     .cite { font-family: system-ui, sans-serif; font-size:.62rem; color:#2563eb; margin-left:.25rem; }
     .warnings { background:#fff7ed; border:1px solid #fed7aa; border-radius:.5rem;
@@ -61,9 +65,12 @@
       <tr>
         <td class="tc">{{ s.timecode or "" }}<div class="scene">{{ s.section or "" }}</div></td>
         <td>
-          {{ s.text }}
+          {{ s.edited_text or s.text }}
+          {% if s.edited_text %}<span class="badge EDITED">edited</span>{% endif %}
           {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence|round(2, 'floor')) }}{% endif %}</span>{% endif %}
           {% if s.claim_ids %}<span class="cite">[{{ s.claim_ids|join(", ") }}]</span>{% endif %}
+          {% if s.decision == "flagged" %}<span class="badge FLAGGED">withheld</span>{% endif %}
+          {% if s.edited_text %}<div class="generated">Generated: {{ s.text }}</div>{% endif %}
         </td>
         <td class="os">{{ s.on_screen or "" }}</td>
         <td class="vis">{{ s.visual or "" }}</td>
@@ -77,10 +84,13 @@
     {% if section %}<div class="section-label">{{ section }}</div>{% endif %}
     {% for s in sents %}
     <p class="sentence">
-      {{ s.text }}
+      {{ s.edited_text or s.text }}
+      {% if s.edited_text %}<span class="badge EDITED">edited</span>{% endif %}
       {% if s.verdict %}<span class="badge {{ s.verdict }}">{{ s.verdict }}{% if s.confidence is not none %} {{ "%.2f"|format(s.confidence|round(2, 'floor')) }}{% endif %}</span>{% endif %}
       {% if s.claim_ids %}<span class="cite">[{{ s.claim_ids|join(", ") }}]</span>{% endif %}
+      {% if s.decision == "flagged" %}<span class="badge FLAGGED">withheld</span>{% endif %}
     </p>
+    {% if s.edited_text %}<p class="generated">Generated: {{ s.text }}</p>{% endif %}
     {% endfor %}
   </div>
   {% endfor %}
